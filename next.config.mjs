@@ -1,13 +1,13 @@
-import createMDX from "@next/mdx";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import rehypePrettyCode from "rehype-pretty-code";
-import rehypeSlug from "rehype-slug";
-import remarkGfm from "remark-gfm";
+import createMDX from '@next/mdx';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeSlug from 'rehype-slug';
+import remarkGfm from 'remark-gfm';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Configure `pageExtensions` to include markdown and MDX files
-  pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
+  pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
 };
 
 const withMDX = createMDX({
@@ -20,7 +20,7 @@ const withMDX = createMDX({
       [
         rehypePrettyCode,
         {
-          theme: "one-dark-pro",
+          theme: 'one-dark-pro',
         },
       ],
     ],
