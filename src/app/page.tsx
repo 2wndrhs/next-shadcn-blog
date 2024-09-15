@@ -1,23 +1,25 @@
-import { Pagination } from "@/components/Pagination";
-import { Posts } from "@/components/Posts";
-import { getPaginatedPosts, postsPerPage } from "@/posts";
+import { getPosts } from '@/lib/posts';
 
 export default async function Home() {
-  const { posts, total } = await getPaginatedPosts({
-    page: 1,
-    limit: postsPerPage,
-  });
+  const posts = await getPosts();
 
   return (
     <main>
       <h1>Next.js MDX Blog</h1>
-      <Posts posts={posts} />
-      <Pagination
-        baseUrl="/page"
-        page={1}
-        perPage={postsPerPage}
-        total={total}
-      />
+      {posts.map(({ slug, title, description, publishDate, tags }) => (
+        <article key={slug}>
+          <h2>
+            <a href={`/${slug}`}>{title}</a>
+          </h2>
+          <p>{description}</p>
+          <p>
+            <strong>Published: {publishDate}</strong>
+          </p>
+          <p>
+            <strong>Tags:</strong> {tags.join(', ')}
+          </p>
+        </article>
+      ))}
     </main>
   );
 }
