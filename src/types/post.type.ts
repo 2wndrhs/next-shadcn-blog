@@ -9,5 +9,4 @@ export interface PostMetaData extends Metadata {
 
 export interface Post extends PostMetaData {
   slug: string;
-  readingMinutes: number;
 }

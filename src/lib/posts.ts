@@ -1,12 +1,10 @@
 import { Post, PostMetaData } from '@/types/post.type';
 import dayjs from 'dayjs';
-import { readdir, readFile } from 'fs/promises';
+import { readdir } from 'fs/promises';
 import path from 'path';
-import readingTime from 'reading-time';
 
 const BASE_PATH = '/src/app/(posts)/blog';
 const POSTS_PATH = path.join(process.cwd(), BASE_PATH);
-const METADATA_DELIMITER = '---';
 
 export const postsPerPage = 3;
 
@@ -17,23 +15,17 @@ export const getPosts = async (): Promise<Post[]> => {
   );
 
   const posts = await Promise.all(
-    slugs.map(async ({ name }) => {
-      const filePath = `${POSTS_PATH}/${name}/page.mdx`;
-      const fileContents = await readFile(filePath, 'utf8');
-      // split the file content by `---`
-      const [_, content] = fileContents.split(METADATA_DELIMITER);
-      const readingMinutes = Math.ceil(readingTime(content).minutes);
-
+    slugs.map(async ({ name: slug }) => {
       // retrieve metadata from MDX files
       const { metadata } = (await import(
-        `@/app/(posts)/blog/${name}/page.mdx`
+        `@/app/(posts)/blog/${slug}/page.mdx`
       )) as { metadata: PostMetaData };
 
       const publishDate = dayjs(metadata.publishDate)
         .locale('ko')
         .format('YYYY년 MM월 DD일');
 
-      return { ...metadata, slug: name, readingMinutes, publishDate };
+      return { ...metadata, slug: slug, publishDate };
     }),
   );
 
