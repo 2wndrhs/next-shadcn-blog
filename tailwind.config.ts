@@ -21,6 +21,15 @@ const config: Config = {
       maxWidth: {
         page: '1072px',
       },
+      keyframes: {
+        enter: {
+          '0%': { opacity: '0', transform: 'translateY(1rem)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        enter: 'enter 0.6s both',
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
