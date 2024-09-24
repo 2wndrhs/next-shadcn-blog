@@ -37,12 +37,14 @@ export default function RootLayout({
   return (
     <html lang='kr' suppressHydrationWarning>
       <body
-        className={`relative flex min-h-screen w-full flex-col ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
+        className={`flex min-h-screen w-full flex-col ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
       >
         <ThemeProvider>
           <Header />
           <ScrollProgressBar />
-          {children}
+          <div className='pl-safe-left pr-safe-right'>
+            <div className='max-w-page mx-auto w-full'>{children}</div>
+          </div>
         </ThemeProvider>
       </body>
     </html>
