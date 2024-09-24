@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  darkMode: 'class',
+  darkMode: 'selector',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -13,6 +13,13 @@ const config: Config = {
         geistSans: ['var(--font-geist-sans)'],
         geistMono: ['var(--font-geist-mono)'],
         pretendard: ['var(--font-pretendard)'],
+      },
+      padding: {
+        'safe-left': 'max(1.5rem, env(safe-area-inset-left))',
+        'safe-right': 'max(1.5rem, env(safe-area-inset-right))',
+      },
+      maxWidth: {
+        page: '1072px',
       },
       colors: {
         background: 'hsl(var(--background))',
