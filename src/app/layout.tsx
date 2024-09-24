@@ -1,6 +1,5 @@
 import Header from '@/components/layout/Header';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
-import ScrollProgressBar from '@/components/ScrollProgressBar';
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
@@ -41,9 +40,12 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <Header />
-          <ScrollProgressBar />
-          <div className='pl-safe-left pr-safe-right'>
-            <div className='max-w-page mx-auto w-full'>{children}</div>
+          <div className='py-16 pl-safe-left pr-safe-right'>
+            <div className='max-w-page mx-auto w-full'>
+              <div className='flex flex-col gap-6 md:grid md:grid-cols-[auto_640px_auto] lg:grid-cols-[192px_640px_192px]'>
+                {children}
+              </div>
+            </div>
           </div>
         </ThemeProvider>
       </body>
