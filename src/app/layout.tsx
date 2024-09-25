@@ -34,14 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='kr' suppressHydrationWarning>
+    <html
+      lang='kr'
+      className='scrollbar scrollbar-w-2 scrollbar-h-4 scrollbar-track-transparent scrollbar-thumb-foreground/20'
+      suppressHydrationWarning
+    >
       <body
-        className={`flex min-h-screen w-full flex-col ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
+        className={`relative flex min-h-screen w-full flex-col ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
       >
         <ThemeProvider>
           <Header />
           <div className='py-16 pl-safe-left pr-safe-right'>
-            <div className='max-w-page mx-auto w-full'>
+            <div className='mx-auto w-full max-w-page'>
               <div className='flex flex-col gap-6 md:grid md:grid-cols-[auto_640px_auto] lg:grid-cols-[192px_640px_192px]'>
                 {children}
               </div>
