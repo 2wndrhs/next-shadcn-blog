@@ -1,11 +1,11 @@
 'use client';
 
+import ThemeSwitch from '@/components/layout/ThemeSwitch';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Code, Github } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import ThemeSwitch from '../ThemeSwitch';
-import { Button } from '../ui/button';
 
 const NAV_LIST = [
   { name: 'Blog', href: '/blog' },
