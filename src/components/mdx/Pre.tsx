@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Clipboard } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { DetailedHTMLProps, HTMLAttributes, useRef, useState } from 'react';
 
 export default function Pre({
@@ -30,7 +30,7 @@ export default function Pre({
         onClick={handleClickCopy}
         className='absolute right-4 size-6'
       >
-        {isCopied ? <Check /> : <Clipboard />}
+        {isCopied ? <Check /> : <Copy />}
       </button>
       {children}
     </pre>
