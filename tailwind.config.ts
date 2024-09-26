@@ -84,5 +84,6 @@ const config: Config = {
     require('@tailwindcss/typography'),
     require('tailwind-scrollbar')({ nocompatible: true }),
   ],
+  safelist: ['pl-4', 'pl-8'],
 };
 export default config;
