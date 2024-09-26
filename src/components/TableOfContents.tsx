@@ -28,7 +28,6 @@ export default function TableOfContents() {
     const observerCallback = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          console.log('entry', entry);
           setActiveId(entry.target.id);
         }
       });
@@ -58,10 +57,13 @@ export default function TableOfContents() {
   }, []);
 
   return (
-    <aside className='fixed hidden lg:block' aria-label='Table of contents'>
+    <aside
+      className='fixed hidden motion-safe:animate-enter lg:block'
+      aria-label='Table of contents'
+    >
       <ul className='flex flex-col gap-2 font-geistSans text-sm'>
-        {toc.map(({ id, text, level }) => (
-          <li key={id} className={`pl-${(level - 1) * 4} `}>
+        {toc.map(({ id, text, level }, index) => (
+          <li key={id} className={`pl-${(level - 1) * 4}`}>
             <a
               href={`#${id}`}
               className={`block py-0.5 transition-colors duration-200 ease-in-out hover:text-foreground/80 ${
