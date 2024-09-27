@@ -30,6 +30,29 @@ const config: Config = {
       animation: {
         enter: 'enter 0.6s both',
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            'code::before': {
+              content: '""',
+              paddingLeft: '0.25rem',
+            },
+            'code::after': {
+              content: '""',
+              paddingRight: '0.25rem',
+            },
+            'pre code': {
+              fontFamily: 'var(--font-geist-mono)',
+            },
+            code: {
+              fontFamily: 'var(--font-geist-mono)',
+              fontWeight: 'inherit',
+              backgroundColor: 'hsl(var(--secondary))',
+              borderRadius: 'calc(var(--radius) - 4px)',
+            },
+          },
+        },
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
