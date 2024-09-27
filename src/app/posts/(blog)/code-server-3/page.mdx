@@ -1,0 +1,61 @@
+export const metadata = {
+  title: 'code-server로 사지방에서 코딩하기 - 2',
+  description:
+    'code-server로 사지방에서 코딩하기 - 2 (docker로 code-server 실행)',
+  publishDate: '2022-05-06',
+  tags: ['GCP', 'code-server', 'docker'],
+};
+
+## 들어가며
+
+이번 글은 전 글에서 만든 `GCP 인스턴스`에 `code-server`를 실행시키는 과정입니다.
+
+`GCP 인스턴스`에 바로 `code-server`를 설치하고 실행시켜도 되지만 이 글에서는 `docker`를 이용하여 `code-server`를 실행해보도록 하겠습니다 😊
+
+## docker와 portainer 설치
+
+`docker`는 간단히 **리눅스 OS위에 올라가있는 컨테이너**이고 `portainer`는 **docker 관리를 쉽게 관리**할 수 있게 도와주는 **GUI Web 서비스**입니다.
+
+`GCP 인스턴스`에 `docker`와 `portainer` 설치는 설명이 아주 자세히 되어있는 아래 글을 참고하도록 하자. 👍
+
+> [[GCP]VM(Ubuntu OS) Docker 설치하기.(Portainer 추가)](https://blog.dalso.org/google-cloud-platform-2/nas-project/8618)
+
+- 사지방에서 `9000 포트`가 막혀있어 `portainer` 접속이 안될 수 있다고 합니다..!
+- 스마트폰 같이 정상적인 인터넷 환경에서 `portainer` 접속을 확인해 보시길 바랍니다.
+
+## docker로 code-server 실행
+
+`docker`가 정상적으로 설치가 되었다면 이제 `code-server`를 실행해보도록 하겠습니다.
+
+`code-server`를 개발한 [coder.com](https://coder.com/) 에서 제공해주는 [code-server 이미지](https://hub.docker.com/r/codercom/code-server)로 컨테이너를 실행시킬 것입니다.
+
+아래의 명령어를 콘솔에 입력해 줍니다.
+
+> **_docker run --name code-server -p 80:8080 -v "$PWD:/home/coder/project" -e PASSWORD=원하는비밀번호 codercom/code-server:latest_**
+
+복잡해보이지만 하나씩 천천히 살펴보겠습니다.
+
+- `--name code-server`은 **컨테이너 이름 부여**,
+- `-p 80:8080`는 **호스트 80 포트, 컨테이너 내부 8080 포트 바인드**,
+- `-v "$PWD:/home/coder/project"`는 **호스트의 현재 디렉터리와 컨테이너의 /home/coder/project 디렉터리 볼륨 매칭**,
+- `-e PASSWORD=원하는비밀번호`는 `원하는 비밀번호`로 **컨테이너 비밀번호 환경변수 설정**,
+  `codercom/code-server:latest`는 **이미지 사용**입니다.
+
+이미지는 `docker hub`에서 자동으로 `pull` 되어집니다.
+
+## code-server 접속
+
+`code-server` 컨테이너가 잘 실행이 되었다면 드디어 `code-server`에 접속을 할 차례입니다.
+
+웹 브라우저에서 아래 URL 형식으로 접속합니다.
+
+> http://VM*인스턴스의*외부IP/login
+
+![](https://velog.velcdn.com/images/2wndrhs/post/4bc6e395-98a2-442a-a6aa-40f3f775ecd6/image.JPG)
+이런 화면이 뜬다면 성공입니다 🎉
+
+이제 컨테이너를 실행시킬때 입력한 `-e PASSWORD=원하는비밀번호`에서 **`원하는비밀번호`** 란에 적은 비밀번호를 입력해줍니다.
+![](https://velog.velcdn.com/images/2wndrhs/post/31505e5b-c573-4d24-abd0-6a03b000ad19/image.JPG)
+정상적으로 잘 실행이 되는 것을 볼 수 있습니다 👍
+
+다음 편에서는 `code-server`에서 웹 서비스를 실행할 때 주의할 점들에 대해서 알아보겠습니다.

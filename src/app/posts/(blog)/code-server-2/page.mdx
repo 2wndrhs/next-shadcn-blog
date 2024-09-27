@@ -1,0 +1,189 @@
+export const metadata = {
+  title: 'code-server로 사지방에서 코딩하기 - 3',
+  description:
+    'code-server로 사지방에서 코딩하기 - 3 (code-server로 웹 서비스 실행 시 주의할 점)',
+  publishDate: '2022-05-07',
+  tags: ['GCP', 'code-server', 'docker'],
+};
+
+## 들어가며
+
+이번 글은 전 편에서 만든 `code-server`에서 **웹 서비스**를 실행시킬 때 주의할 점들에 대해서 알아보겠습니다.
+
+프론트엔드 개발을 하다 보면 `code-server`에 `Vue`나 `React` 개발 서버를 띄울 일이 많은데 서버를 띄우고 평소 로컬에서 하던 것처럼 `http://인스턴스의_외부_IP:포트번호` 로 접속해보면 접속이 안 됩니다 🤔
+
+생각해보면 `http://인스턴스의_외부_IP:포트번호`는 우리가 만든 **`GCP 인스턴스`의 포트로 접속**을 하는 것인데 우리는 `GCP 인스턴스`의 `80 포트`에 띄운 `code-server 컨테이너`와 `9000 포트`에 띄운 `portainer` 말고는 `GCP 인스턴스`의 다른 포트를 사용한 적이 없으므로 접속이 되지 않는 것이 당연해보입니다.
+
+그렇다면 `code-server` 안에서 실행시킨 개발 서버와 같은 웹 서비스는 로컬에서 어떻게 접근할 수 있을까요?
+
+## code-server의 sub-path
+
+다행히도 [code-server 공식 문서](https://coder.com/docs/code-server/latest/guide#accessing-web-services)에 해결방법이 나와있습니다. 그것은 바로 `code-server` 에서 제공해주는 `subpath`를 이용하는 것입니다.
+
+간단하게 설명하자면 `code-server` 에서 8081 포트로 웹 서비스를 실행시켰다면 `http://인스턴스의_외부_IP:8081` 로 접속하는 것이 아니라 **`http://인스턴스의_외부_IP/proxy/8081`** 로 접속하는 것입니다.
+
+실제로 [live-server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)를 이용해 접속이 잘 되는지 확인해 보겠습니다.
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1>Code-Server</h1>
+  </body>
+</html>
+```
+
+간단한 `html` 파일을 **홈 디렉터리**에 작성하고 `html` 파일에 우클릭을 한 다음 `Open with Live Server`를 눌러 기본 포트인 `5500 포트`에서 `live-server`를 실행시켜 보겠습니다.
+![](https://velog.velcdn.com/images/2wndrhs/post/e7b1f793-300b-4263-9120-ae9c6cbc722a/image.JPG)
+
+`http://인스턴스의_외부_IP/proxy/5500/test.html` 로 접속해보면 `html` 파일이 잘 보입니다 🎉
+
+다음은 **`code-server` 에서 `React`, `Vue` 개발 서버 설정 방법**에 대해서 알아보겠습니다.
+
+## code-server의 React 개발
+
+`code-server` 에서 [create-react-app](https://create-react-app.dev/) 을 이용해 `React` 프로젝트를 만들고 `npm start`로 기본 포트인 `3000 포트`에 개발 서버를 실행시켜 보겠습니다.
+
+그리고 위에 서술한 것 처럼 `code-server`의 `sub-path` 를 이용하여 `http://인스턴스의_외부_IP/proxy/3000` 으로 접속해보면...
+![](https://velog.velcdn.com/images/2wndrhs/post/f789e607-ad12-4efb-8479-a084dcf18f36/image.JPG)
+
+접속이 되긴 하는데 화면에 아무것도 나오지가 않습니다🤔
+
+그 이유는`create-react-app`이 **기본적으로 서버의 루트 경로에서 호스팅**된다고 추측하기 때문입니다.
+
+따라서 **`create-react-app`이 서버의 루트 경로가 아니라 `/proxy/3000` 경로를 기본 경로로 추측**할 수 있도록 설정을 해줘야 합니다.
+
+### code-server React 개발 서버 기본 경로 설정
+
+`create-react-app`이 `/proxy/3000` 경로를 기본 경로로 추측할 수 있도록 하려면 결국 **`create-react-app`의 [webpack](https://webpack.js.org/) 설정**을 수정해야 합니다.
+
+다행히 `create-react-app`은 간단하게 `webpack` 설정을 수정할 수 있도록 [Advanced Configuration](https://create-react-app.dev/docs/advanced-configuration/) 을 제공합니다.
+
+리액트 프로젝트 루트 경로에 `.env` 파일을 생성하고 아래와 같이 작성합니다.
+
+> **PUBLIC_URL=/absproxy/3000**
+
+이렇게 .env 파일을 작성하고 `npm start`로 개발 서버를 다시 실행시킵니다.
+![](https://velog.velcdn.com/images/2wndrhs/post/e9fb944b-6dbb-42af-aeb3-0e235c9a6706/image.JPG)
+
+정상적으로 리액트 개발 서버가 실행된 모습을 볼 수 있습니다 😀
+
+여기서 `PUBLIC_URL`의 값이 `/proxy/3000`이 아닌 `/absproxy/3000`인 것에 대하여 의문이 있을 수 있습니다.
+
+그 이유는 **` code-server`가 내부적으로 `/proxy/<port>` 경로로 오는 요청을 `/`로 재작성**하기 때문입니다.
+
+따라서 `code-server` 가 요청을 재작성하지 못하도록 **`PUBLIC_URL` 값을 `/absproxy/<port>` 형식으로 작성**해줘야 합니다.
+
+이와 관련하여 더 자세한 내용이 궁금하다면 [code-server docs](https://coder.com/docs/code-server/latest/guide#stripping-proxyport-from-the-request-path) 를 참고해 보시면 좋을 것 같습니다.
+
+### code-server React Web Socket 서버 기본 경로 설정
+
+이제 `code-server` 에서 정상적으로 리액트 개발을 할 수 있게 되었지만 아직 문제점이 하나 남아있습니다 🥲
+
+로컬에서 개발할 때는 잘만 작동하던 [HMR(Hot Module Replacement)](https://webpack.js.org/concepts/hot-module-replacement/)이 작동을 하지 않는다는 것입니다.
+
+`webpack`은 내부적으로 **[Web Socket](https://developer.mozilla.org/ko/docs/Web/API/WebSockets_API) 서버와 통신을 하면서 `HMR`을 구현**합니다. 따라서 `HMR`을 위해서 **`webpack` 설정을 통해 Web Socket 서버 경로를 변경**해주어야 합니다.
+
+[CRA](https://create-react-app.dev/)가 제공하는 [Advanced Configuration](https://create-react-app.dev/docs/advanced-configuration/) 중 `WDS_SOCKET_PATH` 라는 변수로 기본 Web Socket 서버 경로를 변경할 수 있지만 테스트 결과 `HMR`이 정상적으로 작동하지 않아서 **[craco](https://github.com/gsoft-inc/craco) 를 이용하여 `webpack` 설정을 변경**해보도록 하겠습니다.
+
+현재 리액트 프로젝트 루트 경로에서 터미널을 열고 아래와 같이 입력합니다.
+
+> **npm install @craco/craco@alpha --save**
+
+설치가 완료되면 프로젝트 루트 경로에 `craco.config.js` 파일을 생성하고 아래와 같이 작성합니다.
+
+```javascript
+module.exports = {
+  devServer: (devServerConfig) => {
+    devServerConfig.webSocketServer = {
+      options: { path: process.env.PUBLIC_URL + '/ws' },
+    };
+
+    return devServerConfig;
+  },
+};
+```
+
+다음으로 프로젝트 루트 경로에 있는 `package.json` 파일에서 `script` 부분을 아래와 같이 수정합니다.
+
+```javascript
+"scripts": {
+// -   "start": "react-scripts start",
+	"start": "craco start",
+}
+```
+
+마지막으로 .env 파일을 아래와 같이 수정합니다.
+
+> **PUBLIC_URL=/absproxy/3000
+> WDS_SOCKET_PORT=0**
+
+이렇게 `craco`를 통해 Web Socket 서버 경로를 변경해주고 `npm start` 로 개발 서버를 다시 실행시켜 보겠습니다.
+![](https://velog.velcdn.com/images/2wndrhs/post/d16cea81-3dee-4d73-8886-b07cb372cdf3/image.JPG)
+
+정상적으로 Web Socket 서버와 통신이 이루어지고 `HMR`이 잘 동작하는 것을 확인할 수 있습니다 🎉
+
+## code-server의 Vue 개발
+
+`code-server` 에서 [vue-cli](https://cli.vuejs.org/) 을 이용해 Vue 프로젝트를 만들고 `npm run serve`로 8081 포트에 개발 서버를 실행시켜 보겠습니다. 기본 포트인 `8080 포트`를 `code-server`가 점유하고 있으므로 서버는 `8081 포트`에서 실행될 것입니다.
+
+리액트와 마찬가지로 `http://인스턴스의_외부_IP/proxy/8081` 경로로 접속해보면 접속은 되는데 화면에 아무것도 나오지 않는 것을 알 수 있습니다. 그 이유는 `vue-cli` 또한 기본적으로 서버의 루트 경로에서 호스팅 된다고 추측하기 때문입니다.
+
+따라서 `vue-cli` 역시 `/absproxy/8081` 경로를 기본 경로로 추측할 수 있도록 설정을 해주어야 합니다.
+
+### code-server Vue 개발 서버 기본 경로 설정
+
+`create-react-app` 과 마찬가지로 `vue-cli`도 간단하게 `webpack` 설정을 수정할 수 있는 [vue.config.js](https://cli.vuejs.org/config/#vue-config-js) 를 제공합니다.
+
+Vue 프로젝트 루트 경로에 vue.config.js 파일을 생성하고 아래와 같이 작성합니다.
+
+```javascript
+module.exports = {
+  publicPath: '/absproxy/8081',
+};
+```
+
+이렇게 vue.config.js 파일을 작성하고 `npm run serve`로 개발 서버를 다시 실행시킵니다.
+![](https://velog.velcdn.com/images/2wndrhs/post/9d19afc8-dc60-4e55-9d2a-b3befbacf315/image.png)
+
+정상적으로 Vue 개발 서버가 실행된 모습을 볼 수 있습니다 😀
+
+## code-server Vue Web Socket 서버 기본 경로 설정
+
+Vue 개발서버가 정상적으로 실행 되고 있는 것처럼 보이지만 역시나 `HMR`이 작동하지 않습니다 🥲
+
+해결방법은 예상했던 것처럼 Web Socket 서버의 기본 경로를 수정해주어야 합니다.
+
+`vue.config.js` 파일을 아래와 같이 수정합니다.
+
+```javascript
+module.exports = {
+  publicPath: '/absproxy/8081',
+  devServer: {
+    public: 'http://인스턴스의_외부_IP/absproxy/8081',
+    sockPath: '/absproxy/8081/sockjs-node',
+  },
+};
+```
+
+이렇게 Web Socket 서버 경로를 변경해주고 `npm run serve` 로 개발 서버를 다시 실행시키면 `HMR`이 정상적으로 동작하는 것을 확인할 수 있습니다 😊
+
+## 마치며
+
+이상으로 `code-server`로 사지방에서 코딩하기 시리즈가 끝이 났습니다.
+
+하지만 `code-server`에 `HTTPS`가 아닌 `HTTP`로 접속하고 있기 때문에 프리뷰가 지원되지 않는 등의 문제가 남아있습니다.
+
+저도 이 문제를 해결하기 위해 결국에는 `docker`를 이용하지 않고 VPS 인스턴스에 바로 `code-server`를 실행시키고 [`caddy`](https://caddyserver.com/)를 통해 `HTTPS` 접속하는 방식을 선택했습니다 🥲
+
+개인적으로도 `docker`를 이용한 방법보다 사용자 경험이 더 좋았어서 `caddy`를 이용해 `code-server`를 띄우는 글도 추가적으로 작성해보려 합니다.
+
+여기까지 긴 글 읽어주셔서 감사하고 무엇보다 나라를 위해 고생하시는 많은 국군 장병들께 감사드립니다 🙇‍♂️
+
+~~거꾸로 매달아도 국방부 시계는 흘러갑니다~~

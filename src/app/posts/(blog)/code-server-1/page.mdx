@@ -1,0 +1,55 @@
+export const metadata = {
+  title: 'code-server로 사지방에서 코딩하기 - 1',
+  description: 'code-server로 사지방에서 코딩하기 - 1 (GCP 인스턴스 생성)',
+  publishDate: '2022-05-05',
+  tags: ['GCP', 'code-server', 'docker'],
+};
+
+## 들어가며
+
+사지방(사이버 지식 정보방)에서 코딩을 하려고 하면 보통 `하모니카 os`에 기본적으로 설치되어있는 `Visual Studio Code`를 이용하게 됩니다.
+
+하지만 컴퓨터를 재부팅하면 파일들이 모두 날라가게 되고 `root` 권한을 획득하지 못하기 때문에 개발에 많은 무리가 있습니다. 그렇다고 `구름 IDE` 같은 웹 IDE를 사용하자니 여러 제약 사항들과 `VS Code`에서 지원하는기능들을 사용하지 못한다는 점이 문제가 됩니다.
+
+이러한 경우에 `code-server`가 좋은 해결책이 될 수 있습니다.
+
+## code-server
+
+`code-server`는 `VS Code`를 웹 브라우저에서 접속하여 `VS Code` 개발 환경을 사용할 수 있도록 해줍니다.
+
+`하모니카 OS`에도 웹 브라우저는 있으므로 `code-server`를 이용해 `VS Code`와 동일한 개발환경에서 코딩을 할 수 있는 것입니다. 개인 컴퓨터를 이용하여 `code-server`를 띄울 수도 있지만 예상치 못한 여러 변수가 있을 수 있으니 `VPS`를 이용하는 것이 좋습니다.
+
+글에서는 `GCP(Google Cloud Platform)`를 이용하여 개인 서버를 만들어 보도록 하겠습니다.
+
+## GCP
+
+`GCP(Google Cloud Platform)`은 신규 사용자에게 **3달의 사용기한이 있는 300$의 무료 크레딧**을 제공해줍니다. 이 무료 크레딧을 이용하여 성능 좋은 개인 서버를 만들어보도록 하겠습니다.
+
+### GCP 인스턴스 생성
+
+1. 먼저 [GCP](https://cloud.google.com/)에 접속을 해줍니다.
+
+![](https://velog.velcdn.com/images/2wndrhs/post/04d2103c-8030-4ecd-8eec-619cc4c7702d/image.JPG) 2. 이러한 화면이 나올텐데 가운데에 대문짝만하게 적혀있는 **무료로 시작하기**를 눌러 로그인까지 진행해줍니다.
+
+![](https://velog.velcdn.com/images/2wndrhs/post/7642ed98-0730-466b-afdb-aaffec117e61/image.JPG) 3. 좌측 상단에 있는 **탐색 메뉴 > Compute Engine > VM 인스턴스**로 들어간 뒤 `인스턴스 만들기`를 눌러 VM 설정을 진행합니다.
+
+![](https://velog.velcdn.com/images/2wndrhs/post/b51f6c07-7a91-4842-ba60-c43c367d8c69/image.JPG)
+
+- **리전은 서울, 머신 구성은 시리즈 E2, 유형은 e2-highmem-2**로 해줍니다.
+
+![](https://velog.velcdn.com/images/2wndrhs/post/1e70cfc1-ebcc-4949-bf18-efab06d67fec/image.JPG)
+
+- **부팅 디스크는 Ubuntu 18.04LTS, 크기는 100GB로 해주고, 방화벽에서 HTTP 허용, HTTPS 트래픽 허용**을 체크해줍니다. (HTTP 트래픽 허용은 이후 code-server 접속을 위해 꼭 체크해야 합니다.)
+
+![](https://velog.velcdn.com/images/2wndrhs/post/7e30b6f7-97ed-4b75-b6b5-6c97ef3d5b7c/image.JPG)
+
+- 비용은 **한 달 약 100$** 로 3달, **300$인 무료 크레딧**을 아주 알차게 사용할 수 있습니다.
+
+![](https://velog.velcdn.com/images/2wndrhs/post/c261562a-4a02-400b-91d4-64d356423dc6/image.JPG)
+
+- 인스턴스를 만들었다면 이러한 화면이 나올텐데 **제일 우측 연결 탭에서 SSH 접속**을 눌러줍니다.
+
+![](https://blog.dalso.org/wp-content/uploads/2020/04/image-735.png)
+이렇게 SSH 콘솔 창이 뜨면 성공입니다.
+
+1편은 여기서 마치고 다음 편에서는 `VM`에 `docker`를 설치하고 본격적으로 `code-server`를 띄워보도록 하겠습니다.

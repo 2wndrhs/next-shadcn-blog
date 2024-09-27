@@ -1,0 +1,398 @@
+export const metadata = {
+  title: 'Suspense Query와 Request Waterfall',
+  description:
+    'TanStack Query 라이브러리의 Suspense Query를 사용 중 발생하는 Request Waterfall 해결하기',
+  publishDate: '2024-07-11',
+  tags: [
+    'request-waterfall',
+    'react-query',
+    'tanstack-query',
+    'react-suspense',
+  ],
+};
+
+## 들어가며
+
+최근 제가 활동하고 있는 동아리인 [유어슈](https://www.instagram.com/yourssu_official/)는 숭실대학교 학생들에게 유용한 기능을 제공하는 [숨쉴때](https://soomsil.de/) 서비스를 개발하고 있습니다. 특히 저는 구글 플레이 스토어처럼 유어슈 및 다른 숭실대학교 학생들이 만든 서비스를 서로 공유할 수 있는 [“서랍장”](https://soomsil.de/drawer/rankings) 기능을 개발하고 있는데요.
+
+이번 글에서는 “서랍장” 서비스 개발 과정에서 [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) 라이브러리의 Suspense Query를 사용하면서 겪었던 Request Waterfall 문제를 어떻게 해결하였는지 공유하려 합니다.
+
+## Request Waterfall?
+
+먼저 Request Waterfall이 무엇인지 알아보겠습니다.
+
+Request Waterfall은 리소스(html, css, js 등)에 대한 요청이 다른 리소스 요청이 완료될 때까지 시작하지 않을 때 발생하는 문제입니다.
+
+예를 들어, 웹 페이지를 로드하는 경우 CSS, JS가 로드 되기 이전에 마크업인 HTML이 먼저 로드되어야 합니다. 이와 같은 경우 CSS, JS에 대한 요청은 HTML에 대한 요청이 완료된 이후에 시작하므로 Request Waterfall이 발생합니다.
+
+```
+1. |-> Markup
+2.   |-> CSS
+2.   |-> JS
+```
+
+인터넷이 빠른 환경에서는 큰 문제가 아닐 수 있지만 만약 유저의 인터넷 환경이 좋지 않다면 사용자 경험에 부정적인 영향을 미칠 수 있습니다.
+
+예를 들어, 250ms의 지연이 발생하는 인터넷 환경에서 4개의 네트워크 요청이 순차적으로 이루어져 Request Waterfall이 발생한다면 리소스를 로드하는 시간만 1초(250ms \* 4)가 소요됩니다.
+
+따라서 Request Waterfall을 없애고 병렬적으로 네트워크 요청을 시작하는 것은 사용자 경험 향상에 필수적이라고 할 수 있습니다.
+
+## TanStack Query와 Request Waterfall
+
+`TanStack Query` 라이브러리를 사용하는 경우에도 역시 Request Waterfall이 발생할 수 있습니다.
+
+`TanStack Query`를 사용하면서 Request Waterfall이 발생하는 이유는 다양하지만 이번 글에서는 [`useSuspenseQuery()`](https://tanstack.com/query/latest/docs/framework/react/reference/useSuspenseQuery)로 생성한 **[Suspense Query](https://tanstack.com/query/latest/docs/framework/react/guides/suspense)를 사용할 때 발생하는 Request Waterfall**에 집중해서 살펴보겠습니다.
+
+앞으로 설명할 내용은 `React Suspense`, 특히 React 18 버전의 `Concurrent Suspense`에 대한 기본적인 지식이 필요하지만 글의 주제에서 다소 벗어나니 아래 훌륭한 두 개의 글로 설명을 대신하도록 하겠습니다.
+
+- [React Suspense 소개 (feat. React v18)](https://www.daleseo.com/react-suspense/#suspense-%EC%82%AC%EC%9A%A9-%ED%9B%84)
+- [rfc-suspense-in-react-18](https://github.com/reactjs/rfcs/blob/main/text/0213-suspense-in-react-18.md#behavior-change-committed-trees-are-always-consistent)
+
+짧게 요약하자면 비동기 작업을 수행하는 컴포넌트에서 `Promise` 객체를 throw하면 가장 가까운 `Suspense` 컴포넌트가 `Promise` 객체를 catch하여 `Promise`가 resolve될 때까지 비동기 작업을 수행하는 컴포넌트의 렌더링을 중단합니다.
+
+이후 비동기 작업을 수행하는 컴포넌트 대신 `fallback` 컴포넌트를 렌더링하고 `Promise`가 resolve되면 `fallback` 컴포넌트 대신 비동기 작업을 수행하는 컴포넌트를 다시 렌더링 합니다.
+
+## Suspense Query와 Request Waterfall
+
+하나의 컴포넌트에서 여러 개의 Suspense Query를 호출할 경우 Request Waterfall이 발생합니다. 즉, 한 컴포넌트에서 발생하는 Suspense Query 호출은 이전 Suspense Query 호출이 완료될 때까지 기다린 후 실행됩니다.
+
+한 컴포넌트에서 Suspense Query가 순차적으로 호출되는 이유를 알아보기 위해 GitHub API에서 사용자 정보와 레포지토리 정보를 Suspense Query로 가져와 출력하는 간단한 `App` 컴포넌트를 생각해보겠습니다.
+
+실제 코드는 [react-suspense-query(CodeSandbox)](https://codesandbox.io/p/sandbox/react-suspense-query-4k76tl?file=%2Fsrc%2FApp.js%3A1%2C1-55%2C1&layout=%257B%2522sidebarPanel%2522%253A%2522EXPLORER%2522%252C%2522rootPanelGroup%2522%253A%257B%2522direction%2522%253A%2522horizontal%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522id%2522%253A%2522ROOT_LAYOUT%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522clyeu2mda00063b6j9n74hvl0%2522%252C%2522sizes%2522%253A%255B100%252C0%255D%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522EDITOR%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522SHELLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522DEVTOOLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%252C%2522sizes%2522%253A%255B60%252C40%255D%257D%252C%2522tabbedPanels%2522%253A%257B%2522clyeu2mda00023b6jbviaj5ex%2522%253A%257B%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2md900013b6j1tnm80ip%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522filepath%2522%253A%2522%252Fsrc%252Findex.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%252C%257B%2522id%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522initialSelections%2522%253A%255B%257B%2522startLineNumber%2522%253A1%252C%2522startColumn%2522%253A1%252C%2522endLineNumber%2522%253A55%252C%2522endColumn%2522%253A1%257D%255D%252C%2522filepath%2522%253A%2522%252Fsrc%252FApp.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%255D%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%252C%2522activeTabId%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%257D%252C%2522clyeu2mda00053b6j0u0k7w08%2522%253A%257B%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522UNASSIGNED_PORT%2522%252C%2522port%2522%253A0%252C%2522path%2522%253A%2522%252F%2522%257D%255D%252C%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%252C%2522activeTabId%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%257D%252C%2522clyeu2mda00033b6je2go8028%2522%253A%257B%2522tabs%2522%253A%255B%255D%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%257D%252C%2522showDevtools%2522%253Atrue%252C%2522showShells%2522%253Afalse%252C%2522showSidebar%2522%253Atrue%252C%2522sidebarPanelSize%2522%253A15%257D)에서 확인할 수 있습니다.
+
+```jsx
+export default function App() {
+  console.log('render app component');
+
+  useEffect(() => {
+    console.log('MOUNTS');
+
+    return () => {
+      console.log('UNMOUNTS');
+    };
+  }, []);
+
+  const { data: user } = useSuspenseQuery({
+    queryKey: ['user'],
+    queryFn: () => {
+      console.log('running user query');
+      return fetchUser();
+    },
+  });
+
+  console.log('after user query');
+
+  const { data: repos } = useSuspenseQuery({
+    queryKey: ['repos'],
+    queryFn: () => {
+      console.log('running repos query');
+      return fetchRepos();
+    },
+  });
+
+  console.log('after repos query');
+
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <div>
+        <h2>User Information</h2>
+        <p>Name: {user.name}</p>
+        <p>Location: {user.location}</p>
+      </div>
+      <div>
+        <h2>Repositories</h2>
+        <ul>
+          {repos.map((repo) => (
+            <li key={repo.id}>{repo.name}</li>
+          ))}
+        </ul>
+      </div>
+    </Suspense>
+  );
+}
+```
+
+`App` 컴포넌트를 실행해보면 `user` 키를 가지는 Suspense Query가 완료된 이후 `repos` 키를 가지는 Suspense Query가 호출되어 두 개의 쿼리 사이에 Request Waterfall이 발생하는 것을 알 수 있습니다.
+
+| ![user](https://velog.velcdn.com/images/2wndrhs/post/9706375d-acd1-4f55-843a-460be1996dbe/image.png) | ![repos](https://velog.velcdn.com/images/2wndrhs/post/fecff004-541e-49f8-9267-d383cc06691a/image.png) |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+
+콘솔 출력 결과와 함께 `App` 컴포넌트의 렌더링 과정에서 Suspense Query가 호출되는 과정을 자세히 살펴보겠습니다.
+
+1. `App` 컴포넌트 렌더링 페이즈 시작
+   - 콘솔에 “render app component” 출력
+2. `user` 키를 가지는 Suspense Query가 `Promise`를 throw함
+   - 콘솔에 “running user query” 출력
+3. `fetchUser()` 함수가 반환하는 `Promise`가 resolve될 때까지 `App` 컴포넌트의 렌더링이 지연됨
+4. `fetchUser()` 함수가 반환하는 `Promise`가 resolve 됨
+5. `App` 컴포넌트 렌더링 페이즈 재시작
+   - 콘솔에 “render app component” 출력
+6. `user` 키를 가지는 Suspense Query의 결과는 fresh 상태로 간주되어 `user` 키를 가지는 Suspense Query가 다시 호출되지 않음
+   - Suspense Query의 `staleTime`은 기본적으로 1초로 설정되기 때문입니다.([suspense.ts](https://github.com/TanStack/query/blob/b58da75a6931d64b11a2bd4fb6c06deacb687349/packages/react-query/src/suspense.ts#L28))
+   - 콘솔에 “after user query” 출력
+7. `repos` 키를 가지는 Suspense Query가 `Promise`를 throw함
+   - 콘솔에 “running repos query” 출력
+8. `fetchRepos()` 함수가 반환하는 `Promise`가 resolve될 때까지 `App` 컴포넌트의 렌더링이 지연됨
+9. `fetchRepos()` 함수가 반환하는 `Promise`가 resolve 됨
+10. `App` 컴포넌트 렌더링 페이즈 재시작
+    - 콘솔에 “render app component” 출력
+11. 6.과 마찬가지의 이유로 `repos` 키를 가지는 Suspense Query가 다시 호출되지 않음
+    - 콘솔에 “after user query” 출력
+    - 콘솔에 “after repos query” 출력
+12. 더이상 Suspense를 일으키는(`Promise`를 throw하는) 코드가 없으므로 렌더링 페이즈가 종료
+13. 렌더링 페이즈에서 계산한 DOM을 실제 DOM에 반영하는 커밋 페이즈 시작
+14. `App` 컴포넌트가 DOM에 마운트되어 `useEffetct()`가 실행되고 콘솔에 “MOUNTS” 출력
+
+과정은 다소 복잡했지만 Suspense Query가 호출될 때 컴포넌트의 렌더링이 지연되고 Suspense Query(`user`)가 완료되었을 때 컴포넌트가 처음부터 다시 렌더링되어 다른 Suspense Query(`repos`)를 호출하기 때문에 Request Waterfall이 발생한다는 것을 알 수 있었습니다.
+
+주의할 점은 `App` 컴포넌트의 렌더링이 모든 Suspense Query가 해결될 때까지 지연되기 때문에 `fallback` 컴포넌트 또한 렌더링되지 않는다는 것입니다. 즉, 모든 Suspense Query가 해결될 때까지 화면에 `fallback` 컴포넌트는 표시되지 않습니다.
+
+`App` 컴포넌트는 모든 Suspense Query가 해결되고 데이터가 준비된 이후에 커밋 페이즈가 시작되어 실제 DOM에 반영되기 때문에 브라우저에서는 온전한 `App` 컴포넌트만 볼 수 있습니다.
+
+## useSuspenseQueries()?
+
+한 컴포넌트에서 여러 개의 Suspense Query를 호출할 때 발생하는 Request Waterfall 문제를 해결하기 위해서 `TanStack Query`는 [`useSuspenseQueries()`](https://tanstack.com/query/latest/docs/framework/react/reference/useSuspenseQueries) 훅을 제공합니다.
+
+`useSuspenseQueries()` 훅은 내부적으로 [`Promise.all()`](https://developer.mozilla.org/ko/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) 메서드를 호출하여 반환되는 `Promise` 객체를 throw하기 때문에 `useSuspenseQuries()`에 인자로 제공하는 모든 Suspense Query를 병렬적으로 호출하여 Request Waterfall 문제를 해결합니다.
+
+실제 코드는 [react-suspense-query-useSuspenseQueries(CodeSandbox)](https://codesandbox.io/p/sandbox/react-suspense-query-forked-3cqk26?layout=%257B%2522sidebarPanel%2522%253A%2522EXPLORER%2522%252C%2522rootPanelGroup%2522%253A%257B%2522direction%2522%253A%2522horizontal%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522id%2522%253A%2522ROOT_LAYOUT%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522clyeu2mda00063b6j9n74hvl0%2522%252C%2522sizes%2522%253A%255B100%252C0%255D%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522EDITOR%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522SHELLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522DEVTOOLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%252C%2522sizes%2522%253A%255B60%252C40%255D%257D%252C%2522tabbedPanels%2522%253A%257B%2522clyeu2mda00023b6jbviaj5ex%2522%253A%257B%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2md900013b6j1tnm80ip%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522filepath%2522%253A%2522%252Fsrc%252Findex.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%252C%257B%2522id%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522initialSelections%2522%253A%255B%257B%2522startLineNumber%2522%253A1%252C%2522startColumn%2522%253A1%252C%2522endLineNumber%2522%253A55%252C%2522endColumn%2522%253A1%257D%255D%252C%2522filepath%2522%253A%2522%252Fsrc%252FApp.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%255D%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%252C%2522activeTabId%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%257D%252C%2522clyeu2mda00053b6j0u0k7w08%2522%253A%257B%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%252C%2522activeTabId%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%252C%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522UNASSIGNED_PORT%2522%252C%2522port%2522%253A0%252C%2522path%2522%253A%2522%252F%2522%257D%252C%257B%2522type%2522%253A%2522SANDBOX_INFO%2522%252C%2522isCloud%2522%253Afalse%252C%2522id%2522%253A%2522clyfuxu28003f3b6jdw9e7z15%2522%252C%2522mode%2522%253A%2522permanent%2522%257D%255D%257D%252C%2522clyeu2mda00033b6je2go8028%2522%253A%257B%2522tabs%2522%253A%255B%255D%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%257D%252C%2522showDevtools%2522%253Atrue%252C%2522showShells%2522%253Afalse%252C%2522showSidebar%2522%253Atrue%252C%2522sidebarPanelSize%2522%253A15%257D)에서 확인할 수 있습니다.
+
+```jsx
+const [userQuery, reposQuery] = useSuspenseQueries({
+  queries: [
+    {
+      queryKey: ['user'],
+      queryFn: () => {
+        return fetchUser();
+      },
+    },
+    {
+      queryKey: ['repos'],
+      queryFn: () => {
+        return fetchRepos();
+      },
+    },
+  ],
+});
+```
+
+`App` 컴포넌트를 실행해보면 두 Suspense Query가 병렬적으로 실행되어 Request Waterfall이 사라진 것을 확인할 수 있습니다.
+
+| ![parallel-user](https://velog.velcdn.com/images/2wndrhs/post/20b4ef56-9dd2-4224-a302-4816a55b3374/image.png) | ![parallel-repos](https://velog.velcdn.com/images/2wndrhs/post/4b849e49-1120-463f-82d1-f055f7d54ae6/image.png) |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+
+## Suspense Infinite Query와 Request Waterfall
+
+---
+
+`useSuspenseQueries()` 훅 사용으로 모든 문제가 해결되면 좋았겠지만 여전히 문제가 남아있었습니다.
+
+개발 중인 “서랍장” 서비스의 페이지 컴포넌트에서는 `useSuspenseQuery()`로 생성한 Suspense Query 뿐만 아니라 [`useSuspenseInfiniteQuery()`](https://tanstack.com/query/latest/docs/framework/react/reference/useSuspenseInfiniteQuery)로 생성한 Suspense Infinite Query 또한 호출하고 있었는데 `useSuspenseQueries()` 훅은 Suspense Infinite Query를 지원하지 않아 사용할 수 없었습니다.
+
+안타깝게도 `useSuspenseInfiniteQuries()`처럼 Suspense Infinite Query를 병렬적으로 호출하는 훅 또한 지원되지 않았기 때문에 `TanStack Query`에서 제공하는 방법으로는 Suspense Infinite Query를 사용하면서 발생하는 Request Waterfall을 해결할 수 없었습니다.
+
+> No, I'm afraid there is currently no such thing as `useInfiniteQueries`
+
+- https://stackoverflow.com/questions/74115236/react-query-usequeries-hook-to-run-useinfinitequery-hooks-in-parallel
+  >
+
+## 1 컴포넌트 : 1 Suspense Query
+
+한 컴포넌트에서 여러 개의 Suspense Query를 호출하면 각 Suspense Query가 호출될 때마다 컴포넌트의 렌더링이 지연되기 때문에 Request Waterfall이 필연적으로 발생합니다.
+
+그렇다면 하나의 컴포넌트에서 하나의 Suspense Query만 호출하면 어떨까요?
+
+앞서 살펴보았던 `App` 컴포넌트를 수정하여 Suspense Query를 사용하여 GitHub 사용자 정보를 가져와 출력하는 `User` 컴포넌트와 Suspense Infinite Query를 사용하여 GitHub 레포지토리 정보를 가져와 출력하는 `Repos` 컴포넌트로 분리해보겠습니다.
+
+실제 코드는 [react-suspense-query-per-component(CodeSandbox)](https://codesandbox.io/p/sandbox/react-suspense-query-per-component-6k2hy7?file=%2Fsrc%2FApp.js%3A4%2C13&layout=%257B%2522sidebarPanel%2522%253A%2522EXPLORER%2522%252C%2522rootPanelGroup%2522%253A%257B%2522direction%2522%253A%2522horizontal%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522id%2522%253A%2522ROOT_LAYOUT%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522UNKNOWN%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522clyeu2mda00063b6j9n74hvl0%2522%252C%2522sizes%2522%253A%255B100%252C0%255D%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522EDITOR%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522EDITOR%2522%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522direction%2522%253A%2522horizontal%2522%252C%2522id%2522%253A%2522SHELLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522SHELLS%2522%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%257D%252C%257B%2522type%2522%253A%2522PANEL_GROUP%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522direction%2522%253A%2522vertical%2522%252C%2522id%2522%253A%2522DEVTOOLS%2522%252C%2522panels%2522%253A%255B%257B%2522type%2522%253A%2522PANEL%2522%252C%2522contentType%2522%253A%2522DEVTOOLS%2522%252C%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%257D%255D%252C%2522sizes%2522%253A%255B100%255D%257D%255D%252C%2522sizes%2522%253A%255B42.99102691924227%252C57.00897308075773%255D%257D%252C%2522tabbedPanels%2522%253A%257B%2522clyeu2mda00023b6jbviaj5ex%2522%253A%257B%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2md900013b6j1tnm80ip%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522filepath%2522%253A%2522%252Fsrc%252Findex.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%252C%257B%2522id%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522initialSelections%2522%253A%255B%257B%2522startLineNumber%2522%253A4%252C%2522startColumn%2522%253A13%252C%2522endLineNumber%2522%253A4%252C%2522endColumn%2522%253A13%257D%255D%252C%2522filepath%2522%253A%2522%252Fsrc%252FApp.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%252C%257B%2522id%2522%253A%2522clyg6037q00023b6jlxv94y0o%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522FILE%2522%252C%2522initialSelections%2522%253A%255B%257B%2522startLineNumber%2522%253A3%252C%2522startColumn%2522%253A1%252C%2522endLineNumber%2522%253A3%252C%2522endColumn%2522%253A60%257D%255D%252C%2522filepath%2522%253A%2522%252Fsrc%252FUser.js%2522%252C%2522state%2522%253A%2522IDLE%2522%257D%255D%252C%2522id%2522%253A%2522clyeu2mda00023b6jbviaj5ex%2522%252C%2522activeTabId%2522%253A%2522clyeuvday00023b6jb7ycpnkt%2522%257D%252C%2522clyeu2mda00053b6j0u0k7w08%2522%253A%257B%2522id%2522%253A%2522clyeu2mda00053b6j0u0k7w08%2522%252C%2522tabs%2522%253A%255B%257B%2522id%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%252C%2522mode%2522%253A%2522permanent%2522%252C%2522type%2522%253A%2522UNASSIGNED_PORT%2522%252C%2522port%2522%253A0%252C%2522path%2522%253A%2522%252F%2522%257D%255D%252C%2522activeTabId%2522%253A%2522clyeu2mda00043b6j0j53scai%2522%257D%252C%2522clyeu2mda00033b6je2go8028%2522%253A%257B%2522tabs%2522%253A%255B%255D%252C%2522id%2522%253A%2522clyeu2mda00033b6je2go8028%2522%257D%257D%252C%2522showDevtools%2522%253Atrue%252C%2522showShells%2522%253Afalse%252C%2522showSidebar%2522%253Atrue%252C%2522sidebarPanelSize%2522%253A15%257D)에서 확인할 수 있습니다.
+
+- `App.jsx`
+
+```jsx
+export default function App() {
+  console.log('render app component');
+
+  useEffect(() => {
+    console.log('APP COMPONENT MOUNTS');
+
+    return () => {
+      console.log('APP COMPONENT UNMOUNTS');
+    };
+  }, []);
+
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <User />
+      <Repos />
+    </Suspense>
+  );
+}
+```
+
+- `User.jsx`
+
+```jsx
+export default function User() {
+  console.log('render user component');
+
+  useEffect(() => {
+    console.log('USER COMPONENT MOUNTS');
+
+    return () => {
+      console.log('USER COMPONENT UNMOUNTS');
+    };
+  }, []);
+
+  const { data: user } = useSuspenseQuery({
+    queryKey: ['user'],
+    queryFn: () => {
+      console.log('running user query');
+      return fetchUser();
+    },
+  });
+
+  console.log('after user query');
+
+  return (
+    <div>
+      <h2>User Information</h2>
+      <p>Name: {user.name}</p>
+      <p>Location: {user.location}</p>
+    </div>
+  );
+}
+```
+
+- `Repos.jsx`
+
+```jsx
+export default function Repos() {
+  console.log('render repos component');
+
+  useEffect(() => {
+    console.log('REPOS COMPONENT MOUNTS');
+
+    return () => {
+      console.log('REPOS COMPONENT UNMOUNTS');
+    };
+  }, []);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSuspenseInfiniteQuery({
+      queryKey: ['repos'],
+      queryFn: ({ pageParam }) => {
+        console.log('running repos query');
+        return fetchRepos(pageParam);
+      },
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) => {
+        if (lastPage.length === 10) {
+          return allPages.length + 1;
+        }
+        return undefined;
+      },
+    });
+
+  console.log('after repos query');
+
+  return (
+    <div>
+      <h2>Repositories</h2>
+      <ul>
+        {data.pages.map((page, index) => (
+          <React.Fragment key={index}>
+            {page.map((repo) => (
+              <li key={repo.id}>{repo.name}</li>
+            ))}
+          </React.Fragment>
+        ))}
+      </ul>
+      <button
+        onClick={() => fetchNextPage()}
+        disabled={!hasNextPage || isFetchingNextPage}
+      >
+        {isFetchingNextPage
+          ? 'Loading more...'
+          : hasNextPage
+            ? 'Load More'
+            : 'No More Repos'}
+      </button>
+    </div>
+  );
+}
+```
+
+App 컴포넌트를 실행해보면 User 컴포넌트에서 실행되는 Suspense Query와 Repos 컴포넌트에서 실행되는 Suspense Infinite Query가 병렬적으로 실행되어 Reqeust Waterfall이 사라진 것을 확인할 수 있습니다.
+
+| ![per-component-user](https://velog.velcdn.com/images/2wndrhs/post/5db22593-a4b5-4659-ab67-720cc02d0836/image.png) | ![per-component-repos](https://velog.velcdn.com/images/2wndrhs/post/073f1b48-4471-41b7-992f-1d312d4d1ba2/image.png) |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+
+콘솔 출력 결과와 함께 `App` 컴포넌트의 렌더링 과정에서 `User` 컴포넌트의 Suspense Query와 `Repos` 컴포넌트의 Supense Infinite Query가 호출되는 과정을 자세히 살펴보겠습니다.
+
+1. `App` 컴포넌트 렌더링 페이즈 시작
+   - 콘솔에 “render app component” 출력
+2. `User` 컴포넌트 렌더링 페이즈 시작
+   - 콘솔에 “render user component” 출력
+3. `user` 키를 가지는 Suspense Query가 `Promise`를 throw함
+   - 콘솔에 “running user query” 출력
+4. `fetchUser()` 함수가 반환하는 `Promise`가 resolve될 때까지 `User` 컴포넌트의 렌더링이 지연됨
+5. `Repos` 컴포넌트 렌더링 페이즈 시작
+   - 콘솔에 “render repos component” 출력
+6. `repos` 키를 가지는 Suspense Infinite Query가 `Promise`를 throw함
+   - 콘솔에 “running repos query” 출력
+7. `fetchRepos()` 함수가 반환하는 `Promise`가 resolve될 때까지 `Repos` 컴포넌트의 렌더링이 지연됨
+8. `Suspense` 컴포넌트의 자식 컴포넌트 중 렌더링이 지연된 컴포넌트가 있으므로 `fallback` 컴포넌트의 렌더링을 준비
+9. `App` 컴포넌트의 커밋 페이즈가 시작되어 `fallback` 컴포넌트가 DOM에 마운트되고 `useEffetct()`가 실행되어 콘솔에 “APP COMPONENT MOUNTS” 출력
+10. `fetchUser()` 함수가 반환하는 `Promise`가 resolve 됨
+11. `User` 컴포넌트 렌더링 페이즈 재시작
+    - 콘솔에 “render user component” 출력
+12. `user` 키를 가지는 Suspense Query의 결과는 fresh 상태로 간주되어 쿼리가 다시 호출되지 않음
+    - 콘솔에 “after user query” 출력
+13. `fetchRepos()` 함수가 반환하는 `Promise`가 resolve 됨
+14. `Repos` 컴포넌트 렌더링 페이즈 재시작
+    - 콘솔에 “render repos component” 출력
+15. `user` 키를 가지는 Suspense Query의 결과는 fresh 상태로 간주되어 쿼리가 다시 호출되지 않음
+    - 콘솔에 “after repos query” 출력
+16. `Suspense` 컴포넌트의 자식 컴포넌트 중 렌더링이 지연된 컴포넌트가 없으므로 `User` 컴포넌트와 `Repos` 컴포넌트의 커밋 페이즈 시작
+17. `User` 컴포넌트가 DOM에 마운트되어 `useEffetct()`가 실행되고 콘솔에 “USER COMPONENT MOUNTS” 출력
+18. `Repos` 컴포넌트가 DOM에 마운트되어 `useEffetct()`가 실행되고 콘솔에 “REPOS COMPONENT MOUNTS” 출력
+
+`User` 컴포넌트에서 Suspense Query가 호출되어 컴포넌트의 렌더링이 지연되었지만 Suspense Query가 해결될 때까지 기다리지 않고 형제 요소인 `Repos` 컴포넌트의 렌더링을 시도하였기 때문에 `User` 컴포넌트의 Suspense Query와 `Repos` 컴포넌트의 Suspense Infinite Query가 병렬적으로 실행된 것입니다.
+
+### React 18의 Suspense 렌더링과 React 19의 Suspense 렌더링
+
+이와 같이 React 18 버전에서는 `Suspense` 컴포넌트의 자식 요소의 렌더링이 지연(suspend)되면 다른 형제 요소들을 계속 렌더링하였습니다.
+
+하지만 React 19 RC 버전에서 `Suspense` 컴포넌트의 자식 요소의 렌더링이 지연되면 다른 형제 요소들을 렌더링하지 않고 지연이 발생하는 컴포넌트가 해결될 때까지 기다리도록 렌더링 방식이 변경되었습니다. (https://github.com/facebook/react/pull/26380)
+
+즉, 한 컴포넌트에서 하나의 Suspense Query를 호출하여도 Request Waterfall이 발생할 수 있는 것입니다.
+
+해당 PR은 많은 논란이 있었고 React 팀은 좋은 해결책을 찾을 때까지 React 19 버전 출시를 보류한다고 발표했습니다.
+
+관련하여 자세한 내용을 알고 싶으시면 아래 글을 참고하시면 좋을 것 같습니다.
+
+https://tkdodo.eu/blog/react-19-and-suspense-a-drama-in-3-acts
+
+## 마치며
+
+Request Watefall 문제를 해결하는 방법은 간단했지만 문제가 어떻게 해결되었는지 이해하는 것은 복잡했던 것 같습니다.
+
+문제가 어떻게 해결되었는지 알아보면서 React Suspense의 동작 원리, TanStack Query의 staleTime, React의 렌더링 페이즈와 커밋 페이즈, React 19에서 달라진 Suspense 렌더링 방식까지 다양한 지식을 학습할 수 있었던 값진 경험이었습니다.
+
+단순히 문제를 해결하는 방법을 찾는 것에 그치지 않고 해당 방법이 어떻게 문제를 해결하는 것인지까지 학습하는 것이 중요한 것 같습니다.
+
+## 참고자료
+
+[혹시 무분별하게 Suspense를 사용하고 계신가요?](https://happysisyphe.tistory.com/54)
+
+[React Suspense 소개 (feat. React v18)](https://www.daleseo.com/react-suspense/#suspense-%EC%82%AC%EC%9A%A9-%ED%9B%84)
+
+[Blogged Answers: A (Mostly) Complete Guide to React Rendering Behavior](https://blog.isquaredsoftware.com/2020/05/blogged-answers-a-mostly-complete-guide-to-react-rendering-behavior/)
+
+[Behavioral changes to Suspense in React 18 #7](https://github.com/reactwg/react-18/discussions/7)
+
+[react-query with Suspense confusion #5975](https://github.com/TanStack/query/discussions/5975)
+
+[0213-suspense-in-react-18.md](https://github.com/reactjs/rfcs/blob/main/text/0213-suspense-in-react-18.md#behavior-change-committed-trees-are-always-consistent)
+
+[React 19 and Suspense - A Drama in 3 Acts](https://tkdodo.eu/blog/react-19-and-suspense-a-drama-in-3-acts)
