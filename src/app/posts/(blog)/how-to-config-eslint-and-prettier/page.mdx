@@ -1,0 +1,184 @@
+export const metadata = {
+  title: '알아두면 쓸데있는 ESLint & Prettier 설정 방법',
+  description:
+    '알아두면 쓸데있는 ESLint & Prettier 설정 방법 (feat.우아한테크코스)',
+  publishDate: '2022-12-20',
+  tags: ['ESLint', 'Prettier', 'VSCode', '우아한테크코스'],
+};
+
+우아한테크코스 5기 프리코스를 진행하면서 아주 유용하게 써먹었던 [ESLint](https://eslint.org/)와 [Prettier](https://prettier.io/) 설정 방법을 공유하려고 합니다.
+
+최종 테스트 준비로 바빠 글을 못쓰고 있었는데 [뜨거운 합격](https://namu.wiki/w/%EB%B6%88%ED%95%A9%EA%B2%A9)으로 최종 테스트가 면제되어 글을 쓸 시간이 생겼습니다.🤪
+
+## ESLint & Prettier ?
+
+보통 `ESLint`와 `Prettier` 를 같이 사용하다 보니 두 도구의 차이점을 모르고 사용하는 경우가 많습니다.
+
+> 결론부터 말하자면 **`ESLint`** 는 **`Linter`** 이고 **`Prettier`** 는 **`Formatter`** 입니다.
+
+- `ESLint`와 같은 `Linter` 는 **소스 코드에 문제가 있는지 검사하여 문제가 있는 부분에 `flag`를 달아주는** 소프트웨어 도구입니다.
+
+- `Prettier`와 같은 `Formatter`는 **소스 코드를 일관된 스타일로 작성할 수 있게 코드를 변환해주는** 소프트웨어 도구입니다.
+
+## ESLint & Prettier 같이 사용하기
+
+위에 설명하였듯이 `ESLint`는 `Linter`이고 `Prettier`는 `Formatter`이니 같이 사용해도 아무 문제가 없을 것 같지만 유의할 점이 하나 있습니다.
+
+`ESLint` 규칙은 크게 `코드 스타일 규칙`과 `코드 퀼리티 규칙`으로 나누어집니다. **이 중 `코드 스타일 규칙`이 `코드 포매팅`을 수행하는 `Prettier`와 역할이 겹치고 심지어 `Prettier`와 충돌이 일어날 수 있습니다.**
+
+`Prettier` 측에서도 이런 문제점을 모르지 않기 떄문에 3가지 해결 방법을 제공합니다.
+
+1. **`Prettier`와 충돌하는 `ESLint` 규칙들을 꺼주는 [eslint-config-prettier](https://github.com/prettier/eslint-config-prettier)**
+2. `Prettier`를 `ESLint` 규칙으로 실행시켜주는 [eslint-plugin-prettier](https://github.com/prettier/eslint-plugin-prettier)
+3. `Prettier`를 실행한 직후 `ESLint`를 실행시켜주는 [prettier-eslint](https://github.com/prettier/prettier-eslint)
+
+이 중 `eslint-plugin-prettier`와 `prettier-eslint`는 [여러 단점들](https://prettier.io/docs/en/integrating-with-linters.html)이 있어 `Prettier` 측에서는 **`eslint-config-prettier`** 를 가장 추천한다고 합니다.
+
+이 글에서도 **`eslint-config-prettier`** 를 이용하여 `Prettier`와 `ESLint`의 충돌을 해결해 보겠습니다.
+
+## ESLint & Prettier 설정하기
+
+### ESLint 설정
+
+먼저, `ESLint`부터 설정하겠습니다.
+
+1. 프로젝트 루트 폴더 위치에서 터미널에 `npm init @eslint/config` 명령어를 입력하여 **`ESLint`** 설정을 시작합니다. (**이때, `package.json` 파일이 미리 생성되어 있어야합니다.**)
+
+2. 기본적인 `ESLint` 설정을 어떻게 할지 질문을 여러 가지 할 텐데 답변은 아래를 참고하셔서 선택해 주시면 됩니다.
+
+   - `How would you like to use ESLint?`
+
+     - `To check syntax, find problems, and enforce code style`
+
+   - `What type of modules does your project use?`
+     - `CommonJS`와 `ES modules` 중 선호하는 모듈 시스템을 선택 (우아한테크코스 미션들의 모듈 시스템은 `CommonJS`)
+   - `Which framework does your project use?`
+     - 프로젝트가 사용하고 있는 `프레임워크`를 선택
+   - `Does your project use TypeScript?`
+     - 프로젝트가 `TypeScript`를 사용하는지 여부를 선택
+   - `Where does your code run?`
+     - `Browser`와 `Node` 중 코드가 실행되는 환경을 선택 (우아한테크코스 미션들의 실행 환경은 `Node`, 중복 선택도 가능)
+   - `How would you like to define a style for your project?`
+     - `Use a popular style guide`
+   - `Which style guide do you want to follow?`
+     - 선호하는 스타일 가이드 선택 (우아한테크코스의 자바스크립트 스타일 가이드 기준은 `Airbnb`)
+   - `What format do you want your config file to be in?`
+     - `JavaScript`, `YAML`, `JSON` 중 선호하는 설정 파일의 포맷을 선택
+   - `Would you like to install them now? (peerDependencies 설치)`
+     - `Yes`
+   - `Which package manager do you want to use?`
+     - `npm`, `yarn`, `pnpm` 중 선호하는 패키지 매니저를 선택
+
+3. 몇 가지 패키지들이 설치되고 프로젝트 루트 폴더에 **`.eslintrc.js`** (설정 파일 포맷을 `JavaScript`로 하였을 때) 파일이 생성됩니다.
+
+여기까지 기본적인 `ESLint` 설정을 완료했습니다.
+
+### Prettier 설정
+
+다음으로 `Prettier`를 설정하겠습니다.
+
+1. 프로젝트 루트 폴더 위치에서 터미널에 `npm i -D prettier eslint-config-prettier` 명령어를 입력하여 **`prettier`**와 **`eslint-config-prettier`** 패키지를 설치합니다.
+
+2. 프로젝트 루트 폴더 위치에 **`.prettierrc`** 파일 (`prettier 설정 파일`)을 생성합니다.
+
+3. 아래를 참고하여 `prettier` 옵션들을 `.prettierrc` 파일에 작성합니다. 추가적인 옵션들은 [Prettier Options](https://prettier.io/docs/en/options.html)를 참고하시면 됩니다.
+
+```js
+{
+  // 쌍따옴표 대신 홑따옴표 사용
+  "singleQuote": true,
+  // 모든 구문 끝에 세미콜론 출력
+  "semi": true,
+  // 탭 대신 공백으로 들여쓰기
+  "useTabs": false,
+  // 들여쓰기 공백 수
+  "tabWidth": 2,
+  // 가능하면 후행 쉼표 사용
+  "trailingComma": "all",
+  // 줄 바꿈할 길이
+  "printWidth": 80,
+  // 객체 괄호에 공백 삽입
+  "bracketSpacing": true,
+  // 항상 화살표 함수의 매개 변수를 괄호로 감쌈
+  "arrowParens": "always",
+  // OS에 따른 코드라인 끝 처리 방식 사용
+  "endOfLine": "auto"
+}
+```
+
+4. `ESLint`와의 충돌 방지를 위해 `.eslintrc.js` 파일에서 **`extends`** 부분을 아래와 같이 수정합니다. (**이때, `eslint-config-prettier`가 앞선 설정들을 덮어쓸 수 있도록 `prettier`를 마지막에 작성하셔야 합니다.**)
+
+```js
+extends: ['airbnb-base', 'prettier']
+```
+
+여기까지 기본적인 `Prettier` 설정을 완료했습니다.
+
+## VSCode에서 ESLint, Prettier 사용하기
+
+기본적인 `ESLint`와 `Prettier` 설정을 마쳤지만 `VSCode`에서 `ESLint`와 `Prettier`를 온전히 사용하기 위해서는 `VSCode`에서 추가적인 설정들을 해주어야 합니다.
+
+다른 에디터를 사용하시는 분들은 [ESLint](https://eslint.org/docs/latest/user-guide/integrations)와 [Prettier](https://prettier.io/docs/en/editors.html)를 참고하시면 됩니다.
+
+1. `VSCode`의 `Extensions` 탭에서 **`ESLint`** 와 **`Prettier`** 확장 프로그램을 설치합니다.
+
+2. `VSCode`의 **`setting.json`** 파일에 아래 내용을 작성합니다.
+
+```js
+// 파일을 저장할 때마다 `eslint` 규칙에 따라 자동으로 코드를 수정
+"editor.codeActionsOnSave": { "source.fixAll.eslint": true },
+// `prettier`를 기본 포맷터로 지정
+"editor.defaultFormatter": "esbenp.prettier-vscode",
+// 파일을 저장할 때마다 포매팅 실행
+"editor.formatOnSave": true,
+```
+
+이제 파일을 저장할 때마다 `ESLint` 규칙에 따라 자동으로 코드가 수정되고 `Prettier` 설정에 따라 자동으로 코드가 포매팅 됩니다 🎉
+
+## 우아한테크코스를 위한 추가 설정
+
+### 요구사항
+
+우아한테크코스 프리코스 미션들을 수행하다 보면 함수의 매개변수 개수나 함수의 길이를 제한하는 요구사항들을 마주치게 됩니다.
+
+이와 같은 요구사항들도 `ESLint`를 이용해 편하게 관리할 수 있습니다.
+
+`.eslintrc.js` 파일의 **`rules`** 부분을 아래와 같이 수정합니다. (아래 `ESLint` 설정은 우아한테크코스 5기 프리코스 4주차 미션 [다리 건너기](https://github.com/woowacourse-precourse/javascript-bridge) 요구사항들을 기준으로 합니다.)
+
+```js
+rules: {
+  // 들여쓰기 깊이 제한
+  'max-depth': ['error', 2],
+  // 함수의 매개변수 개수 제한
+  'max-params': ['error', 3],
+  // 함수의 길이 제한
+  'max-lines-per-function': ['error', { max: 10 }],
+},
+```
+
+### Jest
+
+우아한테크코스 5기 프리코스 미션들은 [Jest](https://jestjs.io/)를 이용해 테스트를 진행합니다.
+
+아마 테스트 파일들에서 `'jest' is not defined.` 오류가 발생할텐데 `.eslintrc.js` 파일의 **`env`** 부분을 아래와 같이 수정하시면 됩니다.
+
+```js
+env: {
+  ...,
+  jest: true,
+},
+```
+
+추가적으로, 터미널에 `npm i -D @types/jest`를 입력해 `jest` 타입 선언을 설치하시면 `VSCode`에서 `jest` 언어 서비스를 지원해줍니다!
+
+## 마치면서
+
+이상으로 `ESLint`와 `Prettier`를 어떻게 설정하는지에 대해서 알아보았습니다.
+
+프로젝트를 진행할 때마다 매번 인터넷을 찾아보면서 `ESLint`와 `Prettier`를 설정했었는데 우아한테크코스 프리코스를 진행하면서 제대로 `ESLint`와 `Prettier`에 대해서 이해하게 된 것 같습니다.
+
+`ESLint`와 `Prettier`는 코드 품질을 높여주고 코드를 일관된 스타일로 작성할 수 있게 도와주니 여러분들도 적극적으로 사용해 보시는 것을 추천드립니다 😊
+
+## 참고한 글
+
+[prettier와 eslint를 구분해서 사용하자](https://yrnana.dev/post/2021-03-21-prettier-eslint)

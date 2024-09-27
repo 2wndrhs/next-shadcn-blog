@@ -1,0 +1,127 @@
+export const metadata = {
+  title: 'Axios interceptor로 API 응답 에러 처리하기',
+  description:
+    'Axios interceptor로 API 응답 에러 처리하기 (feat. Promise Chaining)',
+  publishDate: '2022-08-03',
+  tags: ['axios', 'axios-interceptor', 'promise'],
+};
+
+## 에러 핸들링
+
+웹 프론트엔드를 개발하다보면 **API 응답 에러 처리**를 위해 각 컴포넌트마다 에러 처리 코드를 작성하게 됩니다. 하지만 `401` 에러와 같이 **공통적인 에러 처리**를 위해 각 컴포넌트마다 에러 처리 코드를 작성하는 것은 비효율적입니다.
+
+이런 경우 [axios interceptor](https://axios-http.com/kr/docs/interceptors) 를 이용하면 효율적으로 API 응답 에러를 처리할 수 있습니다.
+
+## Axios interceptor
+
+`axios interceptor` 를 이용하면 API 요청, 응답을 가로채서 특정 작업을 수행할 수 있습니다. 보통은 **API 요청을 가로채서 헤더를 설정**해주거나 **응답을 가로채서 공통적인 에러 처리**를 수행합니다.
+
+이 글에서는 **API 응답을 가로채서 공통적으로 `401 에러 처리`** 를 하는 과정을 다루겠습니다.
+
+`axios interceptor` 는 다음과 같이 구성됩니다.
+
+- `Axios 인스턴스`
+- `request 설정`
+- `response 설정`
+
+### 예시코드
+
+```javascript
+import axios from 'axios';
+import { store } from '@/store/index';
+import { router } from '@/routes/index';
+
+// axios instance 생성
+const instance = axios.create({
+  baseURL: process.env.VUE_APP_API_URL,
+});
+
+// 요청 인터셉터 추가
+instance.interceptors.request.use(
+  function (config) {
+    // 요청이 전달되기 전에 작업 수행
+    return config;
+  },
+  function (error) {
+    // 요청 오류가 있는 경우 작업 수행
+    return Promise.reject(error);
+  },
+);
+
+// 응답 인터셉터 추가
+instance.interceptors.response.use(
+  function (response) {
+    // 2xx 범위에 있는 상태 코드는 이 함수를 트리거
+    // 응답 데이터가 있는 작업 수행
+    return response;
+  },
+  function (error) {
+    // 2xx 외의 범위에 있는 상태 코드는 이 함수를 트리거
+    // 응답 오류가 있는 작업 수행
+    if (error.response && error.response.status) {
+      switch (error.response.status) {
+        // status code가 401인 경우 `logout`을 커밋하고 `/login` 페이지로 리다이렉트
+        case 401:
+          store.commit('auth/logout');
+          router.push('/login').catch(() => {});
+          break;
+        default:
+          return Promise.reject(error);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+```
+
+## Promise Chaining 때문에 발생하는 문제점
+
+실제로 위 예시처럼 `axios interceptor` 를 적용하여 `401` 에러를 처리하다 보면 문제가 하나 발생합니다. 바로 **[Promise Chaining](https://ko.javascript.info/promise-chaining) 으로 인해 에러가 `interceptor` 안에서만 처리되지 않고 컴포넌트까지 에러가 전파되는 것**입니다.
+
+우리가 원하는 것은 컴포넌트마다 에러 처리 코드를 작성하지 않고 `interceptor` 로 공통적인 에러를 처리하는 것입니다. 하지만 `Promise Chaining` 으로 인해 에러가 컴포넌트까지 전파된다면 결국 컴포넌트마다 에러 처리 코드를 작성해야 하고 `interceptor` 를 사용하는 의미가 없어집니다.
+
+## 해결방법
+
+위 문제점은 두 가지 방법으로 해결할 수 있습니다.
+
+첫 번째 방법은 **`interceptor` 에서 에러를 처리하고 `Promise Chaining` 을 끊어주는 것**입니다.
+
+두 번째 방법은 **`interceptor` 에서 커스텀 에러를 발생시키고 커스텀 에러를 처리하는 에러 핸들러를 만들어 컴포넌트마다 추가**해주는 것입니다.
+
+저는 두 번째 방법처럼 커스텀 에러 핸들러를 만들어 컴포넌트마다 추가해주는 것은 `interceptor` 를 사용하는 의미가 퇴색된다 생각하여 첫 번째 방법인 **`interceptor` 에서 에러를 처리하고 `Promise Chaining` 을 끊어주는 방식**으로 문제를 해결했습니다.
+
+### 이행되지 않는 Promise를 반환하여 Promise Chaining 끊기
+
+`Promise Chaining` 을 끊어주기 위해서는 아래 예시와 같이 `interceptor` 에서 **이행되지 않는 `Promise` 를 반환**해주어야 합니다.
+
+### 예시코드
+
+```javascript
+instance.interceptors.response.use(
+  function (response) {
+    return response;
+  },
+  function (error) {
+    if (error.response && error.response.status) {
+      switch (error.response.status) {
+        // status code가 401인 경우 `logout`을 커밋하고 `/login` 페이지로 리다이렉트
+        case 401:
+          store.commit('auth/logout');
+          router.push('/login').catch(() => {});
+          // 이행되지 않는 Promise를 반환하여 Promise Chaining 끊어주기
+          return new Promise(() => {});
+        default:
+          return Promise.reject(error);
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+```
+
+이제 `interceptor` 안에서만 에러가 처리되고 컴포넌트까지 에러가 전파되지 않는다는 것을 알 수 있습니다 🎉
+
+이행되지 않는 `Promise` 로 인해 메모리 누수를 걱정할 수 있겠지만 https://stackoverflow.com/a/20068922 에 따르면 적어도 모던 브라우저에서는 `Promise` 에 대한 외부 참조가 없는 이상 걱정할 필요가 없다고 합니다.
+
+혹시 글에 잘못 설명된 부분이 있거나 더 좋은 해결책이 있다면 댓글 부탁드립니다 😊
