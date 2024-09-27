@@ -18,7 +18,7 @@ export default async function Page() {
           return (
             <div
               key={year}
-              className={`motion-safe:animate-enter relative border-t border-border/40`}
+              className={`relative border-t border-border/40 motion-safe:animate-enter`}
               style={{
                 animationDelay: `${index * 100}ms`,
               }}
@@ -31,10 +31,10 @@ export default async function Page() {
                   <Link
                     href={`/posts/${post.slug}`}
                     key={post.slug}
-                    className='group/item flex transition-opacity hover:!opacity-100 group-hover:opacity-40'
+                    className='group/item flex transition-opacity group-hover:opacity-40 hover:!opacity-100'
                   >
                     <div className='ml-[20%] flex flex-1 justify-between border-t border-border/40 py-3 group-first-of-type/item:border-t-0'>
-                      <span className='font-geistSans'>{post.title}</span>
+                      <span>{post.title}</span>
                       <span className='px-2 text-sm text-foreground/40'>
                         {dayjs(post.publishDate).format('MM. DD.')}
                       </span>

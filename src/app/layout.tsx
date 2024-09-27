@@ -36,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang='kr'
-      className='scroll-pt-[15%] scroll-smooth scrollbar scrollbar-track-transparent scrollbar-thumb-foreground/20 scrollbar-w-2 scrollbar-h-4'
+      className='scroll-pt-[10%] scroll-smooth scrollbar scrollbar-track-transparent scrollbar-thumb-foreground/20 scrollbar-w-2 scrollbar-h-4'
       suppressHydrationWarning
     >
       <body
