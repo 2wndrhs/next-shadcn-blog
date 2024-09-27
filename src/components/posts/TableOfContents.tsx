@@ -58,11 +58,11 @@ export default function TableOfContents() {
 
   return (
     <aside
-      className='fixed hidden motion-safe:animate-enter lg:block'
+      className='fixed hidden max-w-[192px] motion-safe:animate-enter lg:block'
       aria-label='Table of contents'
     >
-      <ul className='flex flex-col gap-2 font-geistSans text-sm'>
-        {toc.map(({ id, text, level }, index) => (
+      <ul className='flex flex-col gap-2 text-sm'>
+        {toc.map(({ id, text, level }) => (
           <li key={id} className={`pl-${(level - 1) * 4}`}>
             <a
               href={`#${id}`}
