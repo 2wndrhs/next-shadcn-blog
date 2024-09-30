@@ -44,6 +44,9 @@ const config: Config = {
             'pre code': {
               fontFamily: 'var(--font-geist-mono)',
             },
+            a: {
+              wordBreak: 'break-all',
+            },
             code: {
               fontFamily: 'var(--font-geist-mono)',
               fontWeight: 'inherit',
