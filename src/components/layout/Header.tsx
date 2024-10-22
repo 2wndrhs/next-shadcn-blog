@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation';
 
 const NAV_LIST = [
   { name: 'Blog', href: '/blog' },
-  { name: 'TIL', href: '/til' },
+  // { name: 'TIL', href: '/til' },
 ];
 
 export default function Header() {
