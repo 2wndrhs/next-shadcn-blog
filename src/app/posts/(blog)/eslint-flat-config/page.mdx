@@ -1,0 +1,362 @@
+export const metadata = {
+  title: '우아하게 ESLint의 Flat Config System 적용하기',
+  description: '우아하게 ESLint의 Flat Config System 적용하기',
+  publishDate: '2024-10-22',
+  tags: ['eslint', 'prettier', 'wooteco', 'flat config'],
+};
+
+## 들어가며
+
+2년 전 우아한테크코스 5기 프리코스를 진행하면서 유용하게 사용했던 [ESLint와 Prettier 설정 방법](https://www.joonggon.me/posts/how-to-config-eslint-and-prettier)을 공유했었는데요.
+
+이번에 우아한테크코스 7기 프리코스에 다시 참여하게 되었는데 2년이 지난 만큼 ESLint와 Prettier에도 많은 변화가 있어(특히, ESLint) 그러한 변화를 반영한 ESLint와 Prettier 설정 방법을 새롭게 공유하려 합니다.
+
+아래 내용은 ESLint와 Prettier를 사용해본 경험이 있다는 가정하에 쓰였으므로 ESLint와 Prettier를 사용해 보시지 않은 분들은 [이전 글](https://www.joonggon.me/posts/how-to-config-eslint-and-prettier)이나 [ESLint](https://eslint.org/docs/latest/), [Prettier](https://prettier.io/docs/en/) 공식 문서를 참고해 주시면 될 것 같습니다.
+
+또한 VSCode 에디터에 [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)와 [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) 익스텐션이 설치되어 있다는 가정하에 설정을 진행하므로 VSCode에 ESLint, Prettier 익스텐션이 설치되어 있지 않으신 분들은 우선 익스텐션 설치를 진행하시고 아래 ESLint, Prettier 설정을 이어서 진행해주시면 될 것 같습니다.
+
+## ESLint의 Flat Config System
+
+ESLint는 v8.21.0부터 점진적으로 ‘flat config’라는 새로운 설정 시스템을 도입하고 있습니다.
+
+기존의 설정 시스템(eslintrc)에서 여러 위치에 여러 설정 파일, 여러 설정 파일 포맷(`.eslintrc`, `.eslintrc.js`, `.eslintrc.js` 등)을 가지는 것이 가능했던 것과 달리 ‘flat config’ 시스템에서는 프로젝트의 모든 ESLint 관련 설정을 하나의 `eslint.config.js` 파일로 제한합니다.
+
+또한 ‘flat config’ 시스템이 처음 도입되었던 2022년의 JS 생태계에 맞춰 ESLint 설정에 최신 ECMA 버전, ESM 모듈 방식을 기본값으로 설정하고 있습니다.
+
+글에서는 위 2가지 대표적인 변경 사항만 간단하게 소개했지만 ‘flat config’ 시스템에 대해 더 자세히 알고 싶으신 분들은 [Introduction to flat config](https://eslint.org/blog/2022/08/new-config-system-part-2/) 글을 참고하시면 좋을 것 같습니다.
+
+## ESLint 설정하기
+
+이제 본격적으로 [1주차 - 문자열 덧셈 계산기](https://github.com/woowacourse-precourse/javascript-calculator-7) 레포지토리를 기준으로 ‘flat config’ 기반의 ESLint를 설정해보도록 하겠습니다.
+
+1. 프로젝트 루트 폴더 위치에서 `npm init @eslint/config@latest` 명령어를 입력하여 ESLint 설치를 진행합니다.
+2. 터미널에 ESLint 설정을 어떻게 할지 여러 가지 질문이 나올텐데 아래를 참고하셔서 답변해주시면 됩니다.
+   - How would you like to use ESLint?
+     - To check syntax and find problems
+   - What type of modules does your project use?
+     - JavaScript modules (import/export) (7기 프리코스 미션들의 모듈 시스템은 ESM)
+   - Which framework does your project use?
+     - None of these
+   - Does your project use TypeScript?
+     - javascript
+   - Where does your code run?
+     - \<space\>로 Browser를 선택 해제하고 다시 \<space\>로 Node를 선택 (프리코스 미션들은 브라우저가 아닌 Node 환경에서 실행됩니다.)
+   - Would you like to install them now?
+     - Yes
+   - Which package manager do you want to use?
+     - npm (프리코스 미션에서 npm 버전을 제한하고 있으므로 패키지 매니저는 npm을 사용한다고 가정하겠습니다.)
+3. 필요한 패키지들이 설치되고 프로젝트 루트 폴더 위치에 ‘flat config’ 방식의 `eslint.config.js` 설정 파일이 생성된 것을 확인할 수 있습니다.
+
+```jsx
+// eslint.config.js
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+
+export default [
+  { languageOptions: { globals: globals.node } },
+  pluginJs.configs.recommended,
+];
+```
+
+### Airbnb 자바스크립트 스타일 가이드 적용하기
+
+우아한테크코스의 자바스크립트 스타일 가이드는 [Airbnb 자바스크립트 스타일 가이드](https://github.com/airbnb/javascript)를 기준으로 하고 있습니다.
+
+다행히 Airbnb는 스타일 가이드에서 제안하는 사항들을 ESLint 규칙 집합으로 만들어 [eslint-config-airbnb-base](https://www.npmjs.com/package/eslint-config-airbnb-base)  공유 구성(Shared Configs) 형태로 제공하고 있기 때문에 해당 구성을 ESLint 규칙으로 포함시킨다면 Airbnb 자바스크립트 스타일 가이드 방식대로 코드를 작성하는 과정에서 ESLint의 도움을 받을 수 있습니다.
+
+먼저, `eslint-config-airbnb-base` 패키지 설치를 위해 터미널에 아래 명령어를 입력해줍니다.
+
+```bash
+npx install-peerdeps --dev eslint-config-airbnb-base
+```
+
+설치가 완료된 후 `package.json` 파일을 확인해보면 `eslint-config-airbnb-base`, `eslint-plugin-import` 패키지가 설치됨과 동시에 `eslint`의 버전이 v9.X.X에서 v8.57.1로 변경된 것을 확인할 수 있는데(정확한 버전은 패키지 설치 시점에 따라 달라질 수 있습니다.) 이는 `eslint-config-airbnb-base`가 아직 [‘flat config’ 시스템을 지원하지 않아](https://github.com/airbnb/javascript/issues/2804) peer dependencies로 ESLint v9.X.X를 명시하지 않고 있기 때문입니다.
+
+```json
+// https://github.com/airbnb/javascript/blob/master/packages/eslint-config-airbnb-base/package.json
+"peerDependencies": {
+  "eslint": "^7.32.0 || ^8.2.0",
+  "eslint-plugin-import": "^2.30.0"
+},
+```
+
+이 시점에서 저희에게 남은 선택지는 2개입니다.
+
+1. ‘flat config’ 설정 시스템을 유지하면서 `eslint-config-airbnb-base`를 적용하기
+2. 과거의 ESLint 설정 방식(`eslintrc`)으로 돌아가 `eslint-config-airbnb-base`를 적용하기
+
+2번 방식을 선택하면 아주 간단하게 설정할 수 있지만 ESLint v9.0.0부터 기존 `eslintrc` 방식의 설정은 지원되지 않고 v10.0.0 부터는 `eslintrc` 방식의 설정이 완전히 삭제된다고 하니([관련 글](https://eslint.org/blog/2023/10/flat-config-rollout-plans/)) 복잡하더라도 1번 방식으로 설정을 진행해보도록 하겠습니다.
+
+다행히 ESLint에서는 기존 `eslintrc` 설정 시스템과 호환성을 위해 `eslintrc` 스타일의 공유 구성 및 설정을 ‘flat config’ 설정 시스템에서 사용할 수 있도록 하는 [`@eslint/eslintrc`](https://www.npmjs.com/package/@eslint/eslintrc) 패키지의 `FlatCompat` 클래스를 지원합니다.
+
+`@eslint/eslintrc` 패키지 설치를 위해 터미널에 아래 명령어를 입력합니다.
+
+```bash
+npm install @eslint/eslintrc --save-dev
+```
+
+‘flat config’ 시스템을 지원하지 않는 `eslint-config-airbnb-base`를 ‘flat config’ 시스템에서 사용할 수 있도록 [공식 문서](https://eslint.org/docs/latest/use/configure/migration-guide#using-eslintrc-configs-in-flat-config)를 참고하여 아래와 같이 `eslint.config.js` 파일을 수정합니다.
+
+```jsx
+import { FlatCompat } from '@eslint/eslintrc';
+import pluginJs from '@eslint/js';
+import globals from 'globals';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// mimic CommonJS variables -- not needed if using CommonJS
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  { languageOptions: { globals: globals.node, ecmaVersion: 'latest' } },
+];
+```
+
+`ecmaVersion: "latest"`를 명시한 이유는 `import.meta` 프로퍼티가 ES2020([관련 글](https://ui.toast.com/weekly-pick/ko_20200409))에서 추가되었기 때문에 ESLint에게 린팅되는 코드의 버전이 ES2020 이상이라는 것을 알려주기 위함입니다.
+
+위에서 짧게 설명했듯이 ‘flat config’ 시스템에서는 기본적으로 최신 ECMA 버전을 기본값으로 설정하지만 `eslint-config-airbnb-base` 구성에서 ECMA 버전을 2018로 재설정하므로([코드](https://github.com/airbnb/javascript/blob/master/packages/eslint-config-airbnb-base/index.js)) 다시 ECMA 버전을 최신으로 수정해줄 필요가 있습니다.
+
+`eslint.config.js` 파일에서 아래와 같이 무수한 ESLint 오류가 보이신다면 `eslint-config-airbnb-base`가 ESLint에 정상적으로 적용이 된 것입니다. (ESLint 오류가 안보이신다면 VSCode에서 Shift + Command + P를 눌러 Command Palette을 여신 다음 “Restart ESLint Server”를 입력하여 ESLint 서버를 다시 실행시키시면 됩니다.)
+
+![eslint-config-file-error.png](/img/eslint-flat-config/eslint-config-file-error.png)
+
+## eslint.config.js 파일에서 발생하는 ESLInt 오류 해결하기
+
+현재 `eslint.config.js`에서 발생하는 ESLint 오류는 아래 3가지 입니다.
+
+1. Unexpected dangling '\_' in '\_\_filename'. eslint([no-underscore-dangle](https://eslint.org/docs/latest/rules/no-underscore-dangle))
+2. ‘\{패키지 이름\}' should be listed in the project's dependencies, not devDependencies. eslint([import/no-extraneous-dependencies](https://github.com/import-js/eslint-plugin-import/blob/v2.31.0/docs/rules/no-extraneous-dependencies.md))
+3. Strings must use singlequote. eslint([quotes](https://eslint.org/docs/latest/rules/quotes))
+
+이 중 3번 오류는 추후 Prettier를 설정하면서 해결할 예정이므로 우선 1, 2번 오류를 해결해보겠습니다.
+
+### Unexpected dangling '\_' in '\_\_filename'
+
+"Unexpected dangling '\_' in '\_\_filename'. eslint([no-underscore-dangle](https://eslint.org/docs/latest/rules/no-underscore-dangle))" 오류는 Airbnb 자바스크립트 스타일 가이드에서 [변수 이름에 선행 밑줄이나 후행 밑줄을 금지](https://github.com/airbnb/javascript?tab=readme-ov-file#naming--leading-underscore)하기 때문에 발생합니다.
+
+현재 `eslint.config.js`에서는 `__filename`, `__dirname` 변수에 선행 밑줄을 사용하고 있는데 이는 CJS 모듈 환경에서 기본적으로 제공되는 `__filename`, `__dirname` 변수를 ESM 모듈 환경에서 동일하게 사용하기 위함이니 `eslint.config.js` 파일에서는 `no-underscord-dangle` 규칙을 비활성화 해주도록 하겠습니다.
+
+아래와 같이 `eslint.config.js` 파일을 수정합니다.
+
+```jsx
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  { languageOptions: { globals: globals.node, ecmaVersion: 'latest' } },
+  {
+    files: ['eslint.config.js'],
+    rules: {
+      // eslint.config.js 파일에서만 'no-underscore-dangle' 규칙을 비활성화
+      'no-underscore-dangle': 'off',
+    },
+  },
+];
+```
+
+### ‘\{패키지 이름\}' should be listed in the project's dependencies, not devDependencies.
+
+"\{패키지 이름\} should be listed in the project's dependencies, not devDependencies. eslint([import/no-extraneous-dependencies](https://github.com/import-js/eslint-plugin-import/blob/v2.31.0/docs/rules/no-extraneous-dependencies.md))" 오류는 `eslint-config-airbnb-base`패키지가 내부적으로 사용하는`eslint-plugin-import`플러그인의`no-extraneous-dependencies` 규칙으로 인해 발생합니다.
+
+기존 `eslintrc` 설정 시스템 기반의 `eslint-config-airbnb-base` 구성을 ‘flat config’ 설정 시스템에서 사용하는 과정에서 `eslint-plugin-import` 플러그인이 `package.json` 파일이 위치한 디렉토리를 찾지 못해서 발생하는 문제이니 아래와 같이 `eslint.config.js` 파일을 수정합니다.
+
+```jsx
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  { languageOptions: { globals: globals.node, ecmaVersion: 'latest' } },
+  {
+    files: ['eslint.config.js'],
+    rules: {
+      // eslint.config.js 파일에서만 'no-underscore-dangle' 규칙을 비활성화
+      'no-underscore-dangle': 'off',
+      // package.json 파일이 위치한 프로젝트 루트 디렉토리 경로를 명시
+      'import/no-extraneous-dependencies': ['error', { packageDir: __dirname }],
+    },
+  },
+];
+```
+
+## 테스트 파일에서 발생하는 ESLint 오류 해결하기
+
+`__tests__` 디렉토리 하위에 있는 `ApplicationTest.js` 파일에서도 아래 2가지 ESLint 오류가 발생하는 것을 확인할 수 있습니다.
+
+1. Unexpected use of file extension "js" for "../src/App.js" eslint([import/extensions](https://github.com/import-js/eslint-plugin-import/blob/v2.31.0/docs/rules/extensions.md))
+2. ‘jest' is not defined. eslint([no-undef](https://eslint.org/docs/latest/rules/no-undef))
+
+![test-file-eslint-error.png](/img/eslint-flat-config/test-file-eslint-error.png)
+
+### Unexpected use of file extension "js" for "../src/App.js"
+
+`Unexpected use of file extension "js" for "../src/App.js" eslint([import/extensions](https://github.com/import-js/eslint-plugin-import/blob/v2.31.0/docs/rules/extensions.md))` 오류는 Airbnb 자바스크립트 스타일 가이드에서 [모듈을 import할 때 확장자 사용을 금지](https://github.com/airbnb/javascript?tab=readme-ov-file#modules--import-extensions)하고 있기 때문에 발생합니다.
+
+하지만 [ESM 모듈 환경에서는 모듈을 import할 때 확장자 사용이 필수적](https://nodejs.org/docs/latest-v20.x/api/esm.html#mandatory-file-extensions)이기 때문에 `import/extensions` 규칙을 수정할 필요가 있습니다.
+
+아래와 같이 `eslint.config.js` 파일을 수정합니다. 수정된 `import/extensions` 규칙은 모든 JS 파일에 적용되어야 하므로 `files`를 명시하지 않은 설정 객체에 추가해야 합니다.
+
+```jsx
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  {
+    languageOptions: { globals: globals.node, ecmaVersion: 'latest' },
+    rules: {
+      // package import를 제외한 모든 import 구문에 대해 확장자를 사용하도록 강제
+      'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
+    files: ['eslint.config.js'],
+    rules: {
+      // eslint.config.js 파일에서만 'no-underscore-dangle' 규칙을 비활성화
+      'no-underscore-dangle': 'off',
+      // package.json 파일이 위치한 프로젝트 루트 디렉토리 경로를 명시
+      'import/no-extraneous-dependencies': ['error', { packageDir: __dirname }],
+    },
+  },
+];
+```
+
+### ‘jest' is not defined.
+
+`‘jest' is not defined. eslint([no-undef](https://eslint.org/docs/latest/rules/no-undef))` 오류는 ESLint가 jest 프레임워크의 미리 정의된 전역 변수들을 인식하지 못하기 떄문에 발생합니다.
+
+ESLint가 jest의 전역 변수들을 인식할 수 있도록 `eslint.config.js` 파일을 아래와 같이 수정합니다.
+
+```jsx
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  {
+    languageOptions: {
+      globals: { ...globals.node, ...globals.jest },
+      ecmaVersion: 'latest',
+    },
+    rules: {
+      // package import를 제외한 모든 import 구문에 대해 확장자를 사용하도록 강제
+      'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
+    files: ['eslint.config.js'],
+    rules: {
+      // eslint.config.js 파일에서만 'no-underscore-dangle' 규칙을 비활성화
+      'no-underscore-dangle': 'off',
+      // package.json 파일이 위치한 프로젝트 루트 디렉토리 경로를 명시
+      'import/no-extraneous-dependencies': ['error', { packageDir: __dirname }],
+    },
+  },
+];
+```
+
+## Prettier 설정하기
+
+ESLint 설정이 모두 완료되었으니 이어서 Prettier를 설정해보도록 하겠습니다. [이전 글](https://www.joonggon.me/posts/how-to-config-eslint-and-prettier) 에도 언급했지만 ESLint와 Prettier를 함께 설정할 때 주의할 부분은 ESLint의 코드 스타일 규칙들이 Prettier와 충돌할 수 있다는 점입니다.
+
+예를 들어, Airbnb 자바스크립트 스타일 가이드에서는 [문자열 사용시 홑따옴표(single quote)를 사용을 권장](https://github.com/airbnb/javascript?tab=readme-ov-file#strings--quotes)하기 때문에 ESLint의 [quotes](https://eslint.org/docs/latest/rules/quotes) 규칙으로 홑따옴표 사용을 권장하지만 만약 Prettier의 [quotes](https://prettier.io/docs/en/options#quotes) 옵션이 쌍따옴표(double quote)로 설정되어 있다면 ESLint와 Prettier는 같은 스타일 규칙에 대해 충돌한다고 할 수 있습니다.
+
+Prettier는 이러한 충돌을 방지하기 위해 ESLint의 코드 스타일 규칙들을 비활성화 시켜주는 [eslint-config-prettier](https://github.com/prettier/eslint-config-prettier) 패키지를 제공합니다. (`eslint-plugin-prettier` 플러그인은 Prettier에서 권장하는 않는 해결 방법입니다. ([출처](https://prettier.io/docs/en/integrating-with-linters#notes)))
+
+1. `prettier`, `eslint-config-prettier` 설치를 위해 터미널에 아래 명령어를 입력합니다.
+
+```bash
+npm install prettier eslint-config-prettier --save-dev
+```
+
+1. 프로젝트 루트 폴더 위치에 `.prettierrc` 파일 (Prettier 설정 파일)을 생성합니다.
+2. 아래를 참고하여 Prettier 옵션들을 `.prettierrc` 파일에 작성합니다. 추가적인 옵션들은 [**Prettier Options**](https://prettier.io/docs/en/options.html)를 참고하시면 됩니다.
+
+```json
+{
+  // 쌍따옴표 대신 홑따옴표 사용
+  "singleQuote": true,
+  // 모든 구문 끝에 세미콜론 출력
+  "semi": true,
+  // 탭 대신 공백으로 들여쓰기
+  "useTabs": false,
+  // 들여쓰기 공백 수
+  "tabWidth": 2,
+  // 가능하면 후행 쉼표 사용
+  "trailingComma": "all",
+  // 줄 바꿈할 길이
+  "printWidth": 80,
+  // 객체 괄호에 공백 삽입
+  "bracketSpacing": true,
+  // 항상 화살표 함수의 매개 변수를 괄호로 감쌈
+  "arrowParens": "always",
+  // OS에 따른 코드라인 끝 처리 방식 사용
+  "endOfLine": "auto"
+}
+```
+
+1. ESLint와의 충돌 방지를 위해 `eslint.config.js` 파일을 아래와 같이 수정합니다. (`eslint-config-airbnb-base`의 규칙들을 덮어써야하기 때문에 `...compat.extends("airbnb-base")` 뒤에 `prettier`를 추가해야 합니다.)
+
+```jsx
+import prettier from 'eslint-config-prettier';
+
+export default [
+  pluginJs.configs.recommended,
+  ...compat.extends('airbnb-base'),
+  prettier,
+  {
+    languageOptions: {
+      globals: { ...globals.node, ...globals.jest },
+      ecmaVersion: 'latest',
+    },
+    rules: {
+      // package import를 제외한 모든 import 구문에 대해 확장자를 사용하도록 강제
+      'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
+    files: ['eslint.config.js'],
+    rules: {
+      // eslint.config.js 파일에서만 'no-underscore-dangle' 규칙을 비활성화
+      'no-underscore-dangle': 'off',
+      // package.json 파일이 위치한 프로젝트 루트 디렉토리 경로를 명시
+      'import/no-extraneous-dependencies': ['error', { packageDir: __dirname }],
+    },
+  },
+];
+```
+
+## VSCode에서 ESLint, Prettier 익스텐션 사용하기
+
+이제 ESLint와 Prettier 설정을 모두 마쳤으니 VSCode ESLint, Prettier 익스텐션에서 제공하는 강력한 기능들을 사용할 수 있습니다.
+
+VSCode의 `settings.json` 파일에 아래 내용을 추가합니다. (Shift + Command + P를 눌러 Command Palette을 여신 다음 “Open User Settings (JSON)”을 입력하시면 됩니다.)
+
+```json
+// 파일을 저장할 때마다 `eslint` 규칙에 따라 자동으로 코드를 수정
+"editor.codeActionsOnSave": { "source.fixAll.eslint": true },
+// `prettier`를 기본 포맷터로 지정
+"editor.defaultFormatter": "esbenp.prettier-vscode",
+// 파일을 저장할 때마다 포매팅 실행
+"editor.formatOnSave": true,
+```
+
+이제 파일을 저장할 때마다 ESLint 규칙에 따라 자동으로 코드가 수정되고 Prettier 설정에 따라 자동으로 코드가 포매팅 되는 놀라운 경험을 하실 수 있습니다 🚀
+
+## 마치면서
+
+ESLint의 새로운 ‘flat config’ 설정 시스템과 기존 `eslintrc` 설정 시스템 기반의 `eslint-config-airbnb-base` 구성을 통합하는 과정이 생각보다 복잡했는데요.
+
+Airbnb 자바스크립트 스타일 가이드를 ESLint의 ‘flat config’ 시스템과 통합하는데 어려움을 겪고 계시는 분들에게 도움이 되었으면 좋겠습니다.
+
+[1주차 - 문자열 덧셈 계산기](https://github.com/woowacourse-precourse/javascript-calculator-7) 레포지토리에 설정했던 ESLint와 Prettier는 [javascript-calculator-starter](https://github.com/2wndrhs/javascript-calculator-7/tree/javascript-calculator-starter) 브랜치에 남겨놓았으니 필요하시면 참고해 주시면 될 것 같습니다.
+
++) 프로그래밍 요구 사항에 `package.json` 파일은 변경할 수 없다는 제한이 있으니 `package.json` 파일을 PR에 포함시키지 않고 싶은 분들은 ESLint와 Prettier를 설정하면서 변경된 `package.json`, `package-lock.json` 파일을 커밋하지 않으시면 됩니다.
+
+## 참고한 글
+
+- [**ESLint's new config system, Part 1: Background**](https://eslint.org/blog/2022/08/new-config-system-part-1/)
+- [**ESLint's new config system, Part 2: Introduction to flat config**](https://eslint.org/blog/2022/08/new-config-system-part-2/)
+- [Flat config rollout plans](https://eslint.org/blog/2023/10/flat-config-rollout-plans/)
+- [ECMAScript 2020의 새로운 점](https://ui.toast.com/weekly-pick/ko_20200409)
+- [[DevTools] ESLint 9 Flat Config + Prettier 설정 (TypeScript, React)](https://romantech.net/1286)
