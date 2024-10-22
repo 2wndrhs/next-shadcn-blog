@@ -269,8 +269,8 @@ Prettier는 이러한 충돌을 방지하기 위해 ESLint의 코드 스타일 �
 npm install prettier eslint-config-prettier --save-dev
 ```
 
-1. 프로젝트 루트 폴더 위치에 `.prettierrc` 파일 (Prettier 설정 파일)을 생성합니다.
-2. 아래를 참고하여 Prettier 옵션들을 `.prettierrc` 파일에 작성합니다. 추가적인 옵션들은 [**Prettier Options**](https://prettier.io/docs/en/options.html)를 참고하시면 됩니다.
+2. 프로젝트 루트 폴더 위치에 `.prettierrc` 파일 (Prettier 설정 파일)을 생성합니다.
+3. 아래를 참고하여 Prettier 옵션들을 `.prettierrc` 파일에 작성합니다. 추가적인 옵션들은 [**Prettier Options**](https://prettier.io/docs/en/options.html)를 참고하시면 됩니다.
 
 ```json
 {
@@ -295,7 +295,7 @@ npm install prettier eslint-config-prettier --save-dev
 }
 ```
 
-1. ESLint와의 충돌 방지를 위해 `eslint.config.js` 파일을 아래와 같이 수정합니다. (`eslint-config-airbnb-base`의 규칙들을 덮어써야하기 때문에 `...compat.extends("airbnb-base")` 뒤에 `prettier`를 추가해야 합니다.)
+4. ESLint와의 충돌 방지를 위해 `eslint.config.js` 파일을 아래와 같이 수정합니다. (`eslint-config-airbnb-base`의 규칙들을 덮어써야하기 때문에 `...compat.extends("airbnb-base")` 뒤에 `prettier`를 추가해야 합니다.)
 
 ```jsx
 import prettier from 'eslint-config-prettier';
