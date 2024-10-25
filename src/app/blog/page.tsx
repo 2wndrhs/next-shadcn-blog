@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Blog',
+  description: '웹 프론트엔드 개발과 관련된 글을 작성하고 있습니다.',
 };
 
 export default async function Page() {
