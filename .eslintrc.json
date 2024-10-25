@@ -1,15 +1,3 @@
 {
-  "extends": [
-    "next/core-web-vitals",
-    "next/typescript",
-    "plugin:import/recommend",
-    "plugin:import/typescript",
-    "prettier"
-  ],
-  "settings": {
-    "import/resolver": {
-      "typescript": true,
-      "node": true
-    }
-  }
+  "extends": ["next/core-web-vitals", "next/typescript", "prettier"]
 }
