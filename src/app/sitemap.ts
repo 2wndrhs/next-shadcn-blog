@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await getPosts();
 
   const sitemapFromPosts: MetadataRoute.Sitemap = posts.map((post) => ({
-    url: `https://joonggon.me/blog/${post.slug}`,
+    url: `https://joonggon.me/posts/${post.slug}`,
     lastModified: post.publishDate,
     changeFrequency: 'daily',
     priority: 0.5,
