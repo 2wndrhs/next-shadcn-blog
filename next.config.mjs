@@ -1,5 +1,6 @@
 import createMDX from '@next/mdx';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import rehypeExternalLinks from 'rehype-external-links';
 import rehypePrettyCode from 'rehype-pretty-code';
 import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +18,13 @@ const withMDX = createMDX({
     rehypePlugins: [
       rehypeSlug,
       [rehypeAutolinkHeadings],
+      [
+        rehypeExternalLinks,
+        {
+          target: '_blank',
+          rel: ['noopener noreferrer'],
+        },
+      ],
       [
         rehypePrettyCode,
         {
