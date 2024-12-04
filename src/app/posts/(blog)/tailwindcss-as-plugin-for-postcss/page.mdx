@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'create-next-app은 무슨 일을 할까? (PostCSS & Tailwind CSS)',
-  description: 'create-next-app은 무슨 일을 할까? (PostCSS & Tailwind CSS)',
+  title: 'PostCSS의 플러그인으로서 동작하는 Tailwind CSS',
+  description: 'PostCSS의 플러그인으로서 동작하는 Tailwind CSS',
   publishDate: '2024-07-15',
   tags: ['create-next-app', 'next.js', 'postcss', 'tailwindcss'],
 };
@@ -58,7 +58,7 @@ if (tailwind) {
 
 `PostCSS`는 CSS 문자열을 [Abstract Syntax Tree(AST)](https://ko.wikipedia.org/wiki/%EC%B6%94%EC%83%81_%EA%B5%AC%EB%AC%B8_%ED%8A%B8%EB%A6%AC)로 파싱하고, 이 AST를 플러그인(`Tailwind CSS`)에 전달하여 AST를 조작한 후, 다시 AST를 `Stringifier`에 전달하여 CSS 문자열로 변환하는 모듈입니다.
 
-여기서 플러그인은 `PostCSS`가 제공하는 도구들을 기반으로 만들어지는 것이기 때문에 `PostCSS`의 핵심적인 역할은 **CSS를 AST로 파싱하는 `Parser`**로서의 역할이라고 할 수 있습니다.
+여기서 플러그인은 `PostCSS`가 제공하는 도구들을 기반으로 만들어지는 것이기 때문에 `PostCSS`의 핵심적인 역할은 **CSS를 AST로 파싱하는 `Parser`** 로서의 역할이라고 할 수 있습니다.
 
 ### PostCSS의 Parser
 
@@ -72,7 +72,7 @@ if (tailwind) {
 
 실제 코드로 구현된 `PostCSS`의 `Parser`를 살펴보면 토큰을 살펴보고 각 토큰 타입에 해당하는 메서드를 호출하는 [Recursive-Descent Parser](https://en.wikipedia.org/wiki/Recursive_descent_parser) 형태로 구현되어 있음을 알 수 있습니다.
 
-- [potcss/blob/main/lib/parser.js](https://github.com/postcss/postcss/blob/main/lib/parser.js#L439)
+- [postcss/blob/main/lib/parser.js](https://github.com/postcss/postcss/blob/main/lib/parser.js#L439)
 
 ```jsx
 parse() {
@@ -114,7 +114,7 @@ parse() {
   }
 ```
 
-### PostCSS의 플러그인으로 작동하는 Tailwind CSS
+### PostCSS의 플러그인으로 동작하는 Tailwind CSS
 
 브라우저의 렌더링 엔진이 HTML을 파싱하여 생성한 DOM이 HTML 요소를 변경할 수 있는 DOM API를 제공하는 것처럼 `PostCSS`의 AST는 플러그인에서 사용할 수 있는 유용한 [API](https://postcss.org/api/)를 제공합니다.
 
