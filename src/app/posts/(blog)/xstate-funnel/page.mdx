@@ -1,0 +1,323 @@
+export const metadata = {
+  title: 'XState로 우아한 퍼널 만들기',
+  description: 'XState로 우아한 퍼널 만들기',
+  publishDate: '2025-02-28',
+  tags: ['XState', 'Funnel'],
+};
+
+## 들어가며
+
+최근 유어슈에서 숭실대학교 시간표 추천 서비스인 [숭피티](https://soongpt.yourssu.com/)를 출시하였는데요.
+
+시간표 추천을 위해 사용자에게 여러 정보를 입력받아야 하고 모바일 화면에 최적화된 UI를 구성하다 보니 자연스럽게 퍼널 UI를 개발하게 되었습니다.
+
+이번 글에서는 다양한 방법들로 퍼널을 만들어보면서 느꼈던 문제점에 대해서 알아보고 유한 상태 기계 기반 상태 관리 도구인 [XState](https://stately.ai/docs/xstate)로 어떻게 문제점을 해결하고 우아한 퍼널을 만들 수 있었는지 공유하려 합니다.
+
+## 퍼널
+
+![퍼널.png](/img/xstate-funnel/funnel.png)
+
+퍼널은 회원 가입이나 설문 조사 등에서 흔하게 볼 수 있는 여러 페이지에서 상태를 수집하고, 결과 페이지를 보여주는 형태의 UI 입니다.
+
+## 숭피티 퍼널
+
+‘숭피티’에도 시간표 추천을 위해 여러 페이지에 걸쳐 사용자에게 정보를 입력받는 퍼널 UI가 존재합니다.
+
+![숭피티 퍼널.png](/img/xstate-funnel/soongpt-funnel.png)
+
+1. 학과입력 페이지에서 학과를 입력받습니다.
+2. 입학년도입력 페이지로 넘어가 입학년도를 입력받습니다.
+3. 학년입력 페이지로 넘어가 학년을 입력받습니다.
+4. 이전 페이지에서 수집한 학과, 입학년도, 학년 상태로 시간표 추천 API를 호출하여 최종적으로 시간표추천 페이지를 보여줍니다.
+
+설명을 위해 간략하게 축소한 퍼널이니 실제 서비스 되고 있는 ‘숭피티'의 퍼널과는 차이가 있다는 점 참고해주시면 감사하겠습니다.
+
+## 숭피티 퍼널 구현
+
+‘숭피티’ 퍼널을 실제 React 코드로 어떻게 구현할 수 있을까요?
+
+![숭피티 퍼널 구현.png](/img/xstate-funnel/soongpt-funnel-impl.png)
+
+가장 쉽게 떠오르는 방법은 각 페이지를 위한 파일을 4개 만들고 페이지에서 ‘다음' 버튼을 클릭하면 Router의 `navigate()` 함수를 호출하여 다음 페이지로 이동시키는 방법입니다.
+
+학생 상태를 여러 페이지에서 수집해야 하니 전역 상태로 유지하고 학년입력 페이지에서는 각 페이지에서 입력받은 학과, 입학년도, 학년 데이터로 시간표 추천 API를 호출합니다.
+
+> 페이지 4개와 전역 상태를 활용하여 구현한 퍼널의 실제 코드는 https://github.com/2wndrhs/xstate-funnel-demo/tree/global-state-funnel 에서 확인하실 수 있습니다.
+
+## 문제점: 흩어져 있는 흐름과 상태
+
+코드는 문제 없이 정상적으로 작동하지만, 아쉬운 점이 있습니다.
+
+하나의 퍼널을 구성하는 흐름과 상태가 세 페이지에 흩어져 있다는 점입니다.
+
+학과입력 → 입학년도입력 → 학년입력 순으로 이동한다는 퍼널 흐름을 파악하기 위해서 3개 파일을 모두 확인해야 하고 전역 상태를 통해 서로 다른 세 페이지에서 상태를 수집하니 API 요구사항이 변경된다면 역시 3개 파일을 모두 확인하며 수정해야 될 것입니다.
+
+## step 상태로 응집도 높이기
+
+여러 페이지에 흩어져 있던 퍼널 흐름과 상태들을 한 페이지로 모으면 어떨까요?
+
+```tsx
+const [student, setStudent] = useState({
+  학과: '',
+  입학년도: 0,
+  학년: 0,
+});
+
+const [step, setStep] = useState<
+  '학과입력' | '입학년도입력' | '학년입력' | '시간표추천'
+>('학과입력');
+
+return (
+  <main>
+    {step === '학과입력' && (
+      <학과입력
+        onNext={(학과) => {
+          setStudent((prev) => ({ ...prev, 학과 }));
+          setStep('입학년도입력');
+        }}
+      />
+    )}
+    {step === '입학년도입력' && (
+      <입학년도입력
+        onNext={(입학년도입력) => {
+          setStudent((prev) => ({ ...prev, 입학년도입력 }));
+          setStep('학년입력');
+        }}
+      />
+    )}
+    {step === '학년입력' && (
+      <학년입력
+        onNext={async (학년) => {
+          setStudent((prev) => ({ ...prev, 학년 }));
+          await fetch('/api', {
+            body: student,
+          });
+          setStep('시간표추천');
+        }}
+      />
+    )}
+    {step === '시간표추천' && <시간표추천 />}
+  </main>
+);
+```
+
+퍼널이 유지해야하는 데이터인 학과, 입학년도, 학년은 `student`라는 지역 상태로 관리하고 학과입력, 입학년도입력, 학년입력, 시간표추천 순으로 이동하는 퍼널 흐름은 `step` 이라는 지역 상태로 관리합니다.
+
+하나의 퍼널을 구성하는 페이지는 모두 컴포넌트로 만들고 `step` 상태에 따라 컴포넌트를 조건부로 렌더링 해줍니다.
+
+그리고 각 컴포넌트에서 ‘다음' 버튼을 누르면 `step` 상태를 다음에 보여줘야 할 `step`으로 업데이트 해줍니다.
+
+이렇게 퍼널의 흐름과 상태를 한 곳으로 모으니 여러 개의 파일을 넘나들며 전역 상태를 관리하지 않고 디자인이 변경되어도 유연하게 대응할 수 있게 되었습니다.
+
+> 한 페이지 내에서 지역 상태를 활용하여 구현한 퍼널의 실제 코드는 https://github.com/2wndrhs/xstate-funnel-demo/tree/local-state-funnel 에서 확인하실 수 있습니다.
+
+## 문제점: 별개로 관리되는 퍼널 흐름과 상태
+
+하지만 여전히 아쉬운 점이 남아있습니다.
+
+```tsx
+const [student, setStudent] = useState({
+  학과: '',
+  입학년도: 0,
+  학년: 0,
+});
+
+const [step, setStep] = useState<
+  '학과입력' | '입학년도입력' | '학년입력' | '시간표추천'
+>('학과입력');
+```
+
+퍼널 흐름을 나타내는 `step`과 퍼널이 유지해야하는 데이터를 나타내는 `student`가 별개의 상태로 관리된다는 점입니다.
+
+퍼널의 `step`과 상태가 분리되어 있기 때문에 퍼널이 특정 `step`에서 어떤 상태를 가져야하는지 확인하기 어렵습니다. 또한 퍼널 `step`간의 이동이 자유롭기 때문에 개발자의 실수로 사용자를 원하지 않는 `step`으로 이동시킬 수도 있습니다.
+
+## 해결책: XState
+
+이러한 문제점을 해결하기 위해 유한 상태 기계 기반의 상태 관리 도구인 [XState](https://stately.ai/docs/xstate)를 사용할 수 있습니다.
+
+유한 상태 기계를 사용하면 애플리케이션을 유한한 상태들과 상태들간의 전이로 모델링하여 애플리케이션의 동작을 체계적이고 예측 가능하게 만들 수 있습니다.
+
+![XState.png](/img/xstate-funnel/XState.png)
+
+예를 들어, 사진 속 귀여운 강아지는 `잠듬`, `깨어남` 두 가지 상태 중 하나의 상태를 가질 수 있습니다.
+
+`잠듬` 상태의 강아지는 `깨우기` 이벤트를 통해 `깨어남` 상태로 전이하고 `깨어남` 상태의 강아지는 `재우기` 이벤트를 통해 `잠듬` 상태로 전이할 수 있습니다.
+
+## XState와 퍼널
+
+![soongpt-state-chart.png](/img/xstate-funnel/soongpt-state-chart.png)
+
+이러한 유한 상태 기계 기반 상태 관리 도구인 XState는 퍼널과 굉장히 잘 어울립니다.
+
+퍼널의 각 Step을 XState의 상태에 바로 매핑시킬 수 있고 퍼널 Step과 상태를 상태 기계 내부에 함께 관리할 수 있기 때문입니다.
+
+또한 상태의 전이는 명시적인 이벤트를 통해서만 발생하기 때문에 퍼널 Step간의 이동을 예측 가능하게 만듭니다.
+
+## 숭피티 퍼널 머신
+
+XState를 사용하여 ‘숭피티’ 퍼널을 `studentMachine` 이라는 상태 기계로 표현해보겠습니다.
+
+```tsx
+const studentMachine = createMachine({
+  id: 'student',
+  initial: '학과입력',
+  context: {
+    학과: '',
+    입학년도: 0,
+    학년: 0,
+  },
+  states: {
+    학과입력: {
+      on: {
+        학과입력완료: {
+          target: '입학년도입력',
+          actions: assign({ 학과: ({ event }) => event.payload.학과 }),
+        },
+      },
+    },
+    입학년도입력: {
+      on: {
+        입학년도입력완료: {
+          target: '학년입력',
+          actions: assign({ 입학년도: ({ event }) => event.payload.입학년도 }),
+        },
+      },
+    },
+    학년입력: {
+      on: {
+        학년입력완료: {
+          target: '시간표추천',
+          actions: assign({ 학년: ({ event }) => event.payload.학년 }),
+        },
+      },
+    },
+    시간표추천: {
+      type: 'final',
+    },
+  },
+});
+```
+
+`studentMachine`은 `학과입력`, `입학년도입력`, `학년입력`, `시간표추천`이라는 네 가지 상태를 가집니다.
+
+각 상태는 특정 이벤트가 발생했을 때만 다음 상태로 전환되며, 그 과정에서 필요한 데이터를 `context`라는 개체에 저장합니다.
+
+## 머신 상태에 따라 조건부 렌더링
+
+```tsx
+const [snapshot, send] = useMachine(studentMachine);
+
+return (
+  <main>
+    {snapshot.matches('학과입력') && (
+      <학과입력
+        onNext={(학과) => send({ type: '학과입력완료', payload: { 학과 } })}
+      />
+    )}
+    {snapshot.matches('입학년도입력') && (
+      <입학년도입력
+        onNext={(입학년도) =>
+          send({ type: '입학년도입력완료', payload: { 입학년도 } })
+        }
+      />
+    )}
+    {snapshot.matches('학년입력') && (
+      <학년입력
+        onNext={(학년) => send({ type: '학년입력완료', payload: { 학년 } })}
+      />
+    )}
+    {snapshot.matches('시간표추천') && <시간표추천 />}
+  </main>
+);
+```
+
+이렇게 생성한 `studentMachine`을 XState에서 제공하는 `useMachine()` 훅의 인자로 전달하여 호출하면 머신의 현재 상태를 나타내는 `snapshot`과 이벤트를 발생시켜 상태 전이를 일으키는 함수인 `send()`를 받을 수 있습니다.
+
+`snapshot`의 `matches()` 메서드를 호출하여 현재 머신의 상태를 확인하고 머신의 상태에 따라 적절한 컴포넌트를 조건부로 렌더링해줍니다.
+
+그리고 각 컴포넌트에서 ‘다음' 버튼을 누르면 이벤트를 발생시켜 머신을 다음 상태로 전이시킵니다.
+
+이전 `step` 상태로 퍼널 흐름을 관리하던 코드와 비슷해 보일 수 있지만 지금은 퍼널의 흐름과 상태를 변경하는 로직이 전부 `studentMachine` 안에서만 이루어집니다.
+
+퍼널을 구성하는 컴포넌트는 퍼널의 흐름과 상태에 대해서는 알지 못하고 단순히 이벤트만 발생시킬 뿐입니다.
+
+이처럼 퍼널을 구성하는 컴포넌트를 멍청하게 유지하면 디자인이 변경되어도 유연하게 대응할 수 있습니다.
+
+## 퍼널 흐름을 커스텀 훅으로 추상화
+
+꽤나 만족스럽지만 개선할 부분이 남아있는 것 같습니다.
+
+만약 하나의 퍼널이 아니라 여러 퍼널을 만들어야 한다면 어떨까요?
+
+`useMachine()` 훅을 호출하여 `snapshot`을 받고 `snapshot.matches()`를 호출하여 머신의 현재 상태를 확인하여 적절한 컴포넌트를 렌더링하는 코드를 반복적으로 작성해야할 것 같습니다.
+
+이렇게 반복적으로 작성해야하는 퍼널 흐름을 커스텀 훅으로 추상화 해보겠습니다.
+
+```tsx
+export const useStateMachineFunnel = (machine) => {
+  const [snapshot, send] = useMachine(machine);
+
+  const render = (components) => {
+    return components[snapshot.value]({
+      send: send,
+      context: snapshot.context,
+    });
+  };
+
+  return [render, snapshot.value];
+};
+```
+
+`useStateMachineFunnel()` 훅은 머신을 인자로 받아 내부적으로 `useMachine()` 훅을 호출합니다.
+
+`render()` 함수는 퍼널의 각 Step에 해당하는 컴포넌트들을 담은 객체인 `components`를 인자로 받아 퍼널의 현재 Step (`snapshot.value`)에 대응하는 컴포넌트를 찾아 렌더링합니다.
+
+퍼널의 각 Step에 해당하는 컴포넌트는 `send()` 함수와 `context`를 props로 받고 `send()` 함수를 호출하여 머신을 다음 상태로 전이시킬 수 있습니다.
+
+```tsx
+const [render, state] = useStateMachineFunnel(studentMachine);
+
+return (
+  <main>
+    {render({
+      학과입력: ({ send }) => (
+        <학과입력
+          onNext={(학과) => send({ type: '학과입력완료', payload: { 학과 } })}
+        />
+      ),
+      입학년도입력: ({ send }) => (
+        <입학년도입력
+          onNext={(입학년도) =>
+            send({ type: '입학년도입력완료', payload: { 입학년도 } })
+          }
+        />
+      ),
+      학년입력: ({ send }) => (
+        <학년입력
+          onNext={(학년) => send({ type: '학년입력완료', payload: { 학년 } })}
+        />
+      ),
+      시간표추천: () => <시간표추천 />,
+    })}
+  </main>
+);
+```
+
+이렇게 만든 `useStateMachineFunnel()` 훅을 원본 코드에 적용하면 복잡한 조건부 렌더링 대신 `render()` 함수 안에 퍼널의 각 Step에 맞는 컴포넌트를 정의하기만 하면 됩니다.
+
+이처럼 퍼널 흐름을 커스텀 훅으로 추상화하여 일관적으로 다양한 퍼널을 만들 수 있게 되었습니다.
+
+> XState와 커스텀 훅을 활용하여 구현한 퍼널의 실제 코드는 https://github.com/2wndrhs/xstate-funnel-demo/tree/xstate-funnel 에서 확인하실 수 있습니다.
+
+## 마치며
+
+다양한 방법들로 ‘숭피티’ 서비스의 퍼널을 만들어보며 문제점을 분석해보고 XState로 퍼널 흐름과 상태를 응집시켜 문제점을 해결할 수 있었습니다. 또한 반복되는 퍼널 흐름을 커스텀 훅으로 추상화시켜 재사용성을 높일 수 있었습니다.
+
+퍼널 흐름과 상태를 XState로 해결하려는 분들에게 이번 글이 도움이 되었으면 좋겠습니다.
+
+## 참고자료
+
+- [토스 | SLASH 23 - 퍼널: 쏟아지는 페이지 한 방에 관리하기](https://youtu.be/NwLWX2RNVcw?si=_D2KVjQClDcKtsCq)
+- [토스 | @use-funnel 개발기 #1](https://toss.tech/article/use-funnel-1)
+- [Jb Rocher | Building an acquisition Funnel - Part 1](https://dev.indooroutdoor.io/building-an-acquisition-funnel-in-react-with-xstate)
+- [XState | Docs](https://stately.ai/docs)
