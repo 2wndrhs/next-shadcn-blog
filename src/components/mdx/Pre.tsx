@@ -24,15 +24,17 @@ export default function Pre({
   };
 
   return (
-    <pre ref={preRef} {...props} className='relative'>
+    <div className='relative'>
       <button
         disabled={isCopied}
         onClick={handleClickCopy}
-        className='absolute right-4 size-6'
+        className='absolute right-4 top-4 size-6'
       >
-        {isCopied ? <Check /> : <Copy />}
+        {isCopied ? <Check className='text-green-400' /> : <Copy />}
       </button>
-      {children}
-    </pre>
+      <pre ref={preRef} {...props}>
+        {children}
+      </pre>
+    </div>
   );
 }
