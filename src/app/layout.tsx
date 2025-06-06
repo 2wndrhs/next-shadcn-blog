@@ -1,19 +1,20 @@
 import Header from '@/components/layout/Header';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
 
-const geistSans = localFont({
-  src: './fonts/GeistVF.woff',
+const geistSans = Geist({
   variable: '--font-geist-sans',
-  weight: '100 900',
+  subsets: ['latin'],
 });
-const geistMono = localFont({
-  src: './fonts/GeistMonoVF.woff',
+
+const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
-  weight: '100 900',
+  subsets: ['latin'],
 });
+
 const pretendard = localFont({
   src: './fonts/PretendardVariable.woff2',
   variable: '--font-pretendard',
@@ -36,17 +37,17 @@ export default function RootLayout({
   return (
     <html
       lang='kr'
-      className='scroll-pt-[10%] scroll-smooth scrollbar scrollbar-track-transparent scrollbar-thumb-foreground/20 scrollbar-w-2 scrollbar-h-4'
+      className='scrollbar scrollbar-track-transparent scrollbar-thumb-foreground/20 scrollbar-w-2 scrollbar-h-4 scroll-pt-[10%] scroll-smooth'
       suppressHydrationWarning
     >
       <body
-        className={`relative flex min-h-screen w-full flex-col ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
+        className={`relative min-h-screen w-full ${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
       >
         <ThemeProvider>
           <Header />
-          <div className='py-16 pl-safe-left pr-safe-right'>
-            <div className='mx-auto w-full max-w-page'>
-              <div className='flex flex-col gap-6 md:grid md:grid-cols-[auto_640px_auto] lg:grid-cols-[192px_640px_192px]'>
+          <div className='pl-safe-left pr-safe-right py-16'>
+            <div className='mx-auto w-full max-w-screen-xl'>
+              <div className='flex flex-col gap-6 md:grid md:grid-cols-[1fr_640px_1fr]'>
                 {children}
               </div>
             </div>

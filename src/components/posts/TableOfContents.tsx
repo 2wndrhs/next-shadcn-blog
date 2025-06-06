@@ -14,7 +14,6 @@ export default function TableOfContents() {
 
   useEffect(() => {
     const headings = Array.from(document.querySelectorAll('h2, h3'));
-    console.log(headings);
     const newToc = headings.map((heading) => ({
       id: heading.id,
       text: heading.textContent ?? '',
@@ -58,7 +57,7 @@ export default function TableOfContents() {
 
   return (
     <aside
-      className='fixed hidden max-w-[192px] motion-safe:animate-enter lg:block'
+      className='fixed hidden max-w-[192px] lg:block'
       aria-label='Table of contents'
     >
       <ul className='flex flex-col gap-2 text-sm'>
@@ -66,9 +65,9 @@ export default function TableOfContents() {
           <li key={id} className={`pl-${(level - 1) * 4}`}>
             <a
               href={`#${id}`}
-              className={`block py-0.5 transition-colors duration-200 ease-in-out hover:text-foreground/80 ${
+              className={`hover:text-foreground/80 block py-0.5 transition-colors duration-200 ease-in-out ${
                 activeId === id
-                  ? 'font-medium text-foreground/80'
+                  ? 'text-foreground/80 font-medium'
                   : 'text-foreground/40'
               }`}
             >

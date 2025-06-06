@@ -18,21 +18,21 @@ export default function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 flex w-full items-center justify-center border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60`}
+      className={`bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-50 flex w-full items-center justify-center backdrop-blur`}
     >
       <div className='flex h-14 w-full max-w-screen-xl items-center justify-between px-8'>
-        <nav className='flex items-center gap-6 font-geistSans'>
+        <nav className='flex items-center gap-6 font-sans'>
           <Link href='/' className='mr-4 flex items-center space-x-2'>
             <Code className='h-6 w-6' />
-            <span className='inline-block font-bold'>{'JoongGon'}</span>
+            <span className='font-bold'>{'JoongGon'}</span>
           </Link>
           {NAV_LIST.map((navItem) => (
             <Link
               href={navItem.href}
               key={navItem.name}
               className={cn(
-                'text-sm font-medium transition-colors hover:text-foreground/80',
-                pathname?.startsWith(navItem.href)
+                'hover:text-foreground/80 text-sm font-medium transition-colors',
+                pathname.startsWith(navItem.href)
                   ? 'text-foreground'
                   : 'text-foreground/60',
               )}

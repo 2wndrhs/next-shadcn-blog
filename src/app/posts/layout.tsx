@@ -8,7 +8,7 @@ export default function MdxLayout({ children }: { children: React.ReactNode }) {
     <>
       <ScrollProgressBar />
       <TableOfContents />
-      <main className='prose prose-slate max-w-none dark:prose-invert motion-safe:animate-enter md:col-start-2'>
+      <main className='prose prose-zinc dark:prose-invert max-w-none md:col-start-2'>
         {children}
         <GiscusComments />
       </main>
