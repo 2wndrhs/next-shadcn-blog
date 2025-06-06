@@ -1,3 +1,4 @@
+import MotionDiv from '@/components/motion/MotionDiv';
 import { getPostsByYear } from '@/lib/posts';
 import dayjs from 'dayjs';
 import { Metadata } from 'next';
@@ -8,21 +9,44 @@ export const metadata: Metadata = {
   description: '웹 프론트엔드 개발과 관련된 글을 작성하고 있습니다.',
 };
 
+const listVariants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.12,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 10, opacity: 0 },
+  show: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.6,
+    },
+  },
+};
+
 export default async function Page() {
   const posts = await getPostsByYear();
 
   return (
     <main className='col-start-2'>
       <h2 className='mb-16 font-sans font-semibold'>Blog</h2>
-      <div className='group'>
-        {posts.map(([year, postList], index) => {
+      <MotionDiv
+        className='group'
+        variants={listVariants}
+        initial='hidden'
+        animate='show'
+      >
+        {posts.map(([year, postList]) => {
           return (
-            <div
+            <MotionDiv
               key={year}
-              className={`border-border/40 animate-enter relative border-t`}
-              style={{
-                animationDelay: `${index * 100}ms`,
-              }}
+              className={`border-border/40 relative border-t`}
+              variants={itemVariants}
             >
               <h3 className='text-foreground/40 absolute top-3 text-sm'>
                 {year}
@@ -43,10 +67,10 @@ export default async function Page() {
                   </Link>
                 );
               })}
-            </div>
+            </MotionDiv>
           );
         })}
-      </div>
+      </MotionDiv>
     </main>
   );
 }
