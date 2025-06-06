@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 interface TOCItem {
@@ -56,7 +57,10 @@ export default function TableOfContents() {
   }, []);
 
   return (
-    <aside
+    <motion.aside
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className='fixed hidden max-w-[192px] lg:block'
       aria-label='Table of contents'
     >
@@ -76,6 +80,6 @@ export default function TableOfContents() {
           </li>
         ))}
       </ul>
-    </aside>
+    </motion.aside>
   );
 }

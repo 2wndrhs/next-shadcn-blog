@@ -14,7 +14,6 @@ const NAV_LIST = [
 
 export default function Header() {
   const pathname = usePathname();
-  console.log(pathname);
 
   return (
     <header
