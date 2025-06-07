@@ -23,41 +23,49 @@ export default function TableOfContents() {
     setToc(newToc);
 
     // Set up Intersection Observer
-    const observers = new Map<string, IntersectionObserver>();
-
     const observerCallback = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setActiveId(entry.target.id);
+      const visibleHeadings = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.y - b.boundingClientRect.y);
+
+      if (visibleHeadings.length === 0) {
+        const activeHeadingIndex = headings.findIndex(
+          (heading) => heading.id === activeId,
+        );
+
+        if (activeHeadingIndex > 0) {
+          const activeHeading = headings[activeHeadingIndex];
+          const activeHeadingY = activeHeading.getBoundingClientRect().y;
+
+          if (activeHeadingY > 150) {
+            setActiveId(headings[activeHeadingIndex - 1].id);
+          }
         }
-      });
+      } else {
+        setActiveId(visibleHeadings[0].target.id);
+      }
     };
 
     const observerOptions = {
-      rootMargin: '0px 0px -80% 0px',
-      threshold: 1.0,
+      rootMargin: '-56px 0px -80% 0px',
     };
 
-    headings.forEach((heading) => {
-      const element = document.getElementById(heading.id);
-      if (element) {
-        const observer = new IntersectionObserver(
-          observerCallback,
-          observerOptions,
-        );
+    const observer = new IntersectionObserver(
+      observerCallback,
+      observerOptions,
+    );
 
-        observer.observe(element);
-        observers.set(heading.id, observer);
-      }
+    headings.forEach((heading) => {
+      observer.observe(heading);
     });
 
     return () => {
-      observers.forEach((observer) => observer.disconnect());
+      observer.disconnect();
     };
-  }, []);
+  }, [activeId]);
 
   return (
-    <motion.aside
+    <motion.nav
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -80,6 +88,6 @@ export default function TableOfContents() {
           </li>
         ))}
       </ul>
-    </motion.aside>
+    </motion.nav>
   );
 }
