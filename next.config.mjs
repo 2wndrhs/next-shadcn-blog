@@ -8,6 +8,15 @@ import remarkGfm from 'remark-gfm';
 const nextConfig = {
   // Configure `pageExtensions` to include markdown and MDX files
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
+  redirects: async () => {
+    return [
+      {
+        source: '/',
+        destination: '/blog',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 const withMDX = createMDX({
