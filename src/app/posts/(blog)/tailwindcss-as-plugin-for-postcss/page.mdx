@@ -1,0 +1,248 @@
+export const metadata = {
+  title: 'PostCSS의 플러그인으로서 동작하는 Tailwind CSS',
+  description: 'PostCSS의 플러그인으로서 동작하는 Tailwind CSS',
+  publishDate: '2024-07-15',
+  tags: ['create-next-app', 'next.js', 'postcss', 'tailwindcss'],
+};
+
+## 들어가며
+
+[Next.js](https://nextjs.org/)에서 제공하는 CLI 도구인 [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app)을 사용하면 Next.js 애플리케이션을 개발하는데 필요한 모든 설정을 빠르게 구성할 수 있습니다.
+
+`npx create-next-app@latest` 명령어를 터미널에 입력하면 다음과 같은 프롬프트가 출력되고 사용자는 프롬프트에 적절하게 응답하여 Next.js 애플리케이션을 빠르게 구성할 수 있습니다.
+
+```
+What is your project named?  my-app
+Would you like to use TypeScript?  No / Yes
+Would you like to use ESLint?  No / Yes
+Would you like to use Tailwind CSS?  No / Yes
+Would you like to use `src/` directory?  No / Yes
+Would you like to use App Router? (recommended)  No / Yes
+Would you like to customize the default import alias (@/*)?  No / Yes
+```
+
+이번 글에서는 `Would you like to use Tailwind CSS?` 질문에 `Yes`를 선택하면 `create-next-app`이 무슨 일을 수행하는지 자세히 알아보도록 하겠습니다.
+
+## Next.js의 PostCSS와 Tailwind CSS
+
+`Would you like to use Tailwind CSS?` 질문에 `Yes`를 선택하여 Next.js 프로젝트를 생성하면 `PostCSS`와 `Tailwind CSS` 라이브러리가 의존성으로 설치됩니다.
+
+- [create-next-app/templates/index.ts](https://github.com/vercel/next.js/blob/canary/packages/create-next-app/templates/index.ts#L207)
+
+```jsx
+/* Add Tailwind CSS dependencies. */
+if (tailwind) {
+  packageJson.devDependencies = {
+    ...packageJson.devDependencies,
+    postcss: '^8',
+    tailwindcss: '^3.4.1',
+  };
+}
+```
+
+`Tailwind CSS` 라이브러리가 필요하다는 것은 직관적으로 이해가 되지만 `PostCSS` 라이브러리는 왜 필요한지 이해가 잘 되지 않습니다.
+
+결론부터 말씀드리면 **Next.js에서 `PostCSS`는 CSS Parser로서 동작하여 AST를 만들고 `Tailwind CSS`는 `PostCSS`가 생성한 AST로 CSS를 조작하기에 `PostCSS`가 필요합니다.**
+
+## PostCSS Architecture
+
+이해를 돕기 위해 `PostCSS`의 구조에 대해 자세히 살펴보겠습니다.
+
+<p>
+  <img
+    src='https://velog.velcdn.com/images/2wndrhs/post/d4f0cb6d-1366-413d-9b18-3664da4da784/image.png'
+    alt='high-level overview of the PostCSS workflow'
+    width='250px'
+  />
+</p>
+
+`PostCSS`는 CSS 문자열을 [Abstract Syntax Tree(AST)](https://ko.wikipedia.org/wiki/%EC%B6%94%EC%83%81_%EA%B5%AC%EB%AC%B8_%ED%8A%B8%EB%A6%AC)로 파싱하고, 이 AST를 플러그인(`Tailwind CSS`)에 전달하여 AST를 조작한 후, 다시 AST를 `Stringifier`에 전달하여 CSS 문자열로 변환하는 모듈입니다.
+
+여기서 플러그인은 `PostCSS`가 제공하는 도구들을 기반으로 만들어지는 것이기 때문에 `PostCSS`의 핵심적인 역할은 **CSS를 AST로 파싱하는 `Parser`** 로서의 역할이라고 할 수 있습니다.
+
+### PostCSS의 Parser
+
+파서는 CSS 문자열을 구문 분석(파싱)하여 AST를 생성하는 `PostCSS`의 핵심적인 모듈입니다.
+
+`PostCSS`의 파서는 문자열을 의미를 가지는 최소 단위인 토큰으로 분해하는 `Tokenizer`와 토큰을 입력받아 AST를 생성하는 `Parser`로 나뉘어집니다.
+
+이때, `Tokenizer`는 프로그래밍 언어 이론에서 설명하는 소스 코드를 토큰으로 분해하는 `Lexical Analyzer`에 해당하고 `Parser`는 토큰을 분석하여 구문 분석 트리(Parse Tree)를 만드는 `Syntax Analyzer`에 해당한다고 이해하시면 좋을 것 같습니다.
+
+![Interaction between Lexical Analyzer and Parser](https://velog.velcdn.com/images/2wndrhs/post/42331993-ad8c-4f11-b312-2def0a888458/image.png)
+
+실제 코드로 구현된 `PostCSS`의 `Parser`를 살펴보면 토큰을 살펴보고 각 토큰 타입에 해당하는 메서드를 호출하는 [Recursive-Descent Parser](https://en.wikipedia.org/wiki/Recursive_descent_parser) 형태로 구현되어 있음을 알 수 있습니다.
+
+- [postcss/blob/main/lib/parser.js](https://github.com/postcss/postcss/blob/main/lib/parser.js#L439)
+
+```jsx
+parse() {
+    let token
+    while (!this.tokenizer.endOfFile()) {
+      token = this.tokenizer.nextToken()
+
+      switch (token[0]) {
+        case 'space':
+          this.spaces += token[1]
+          break
+
+        case ';':
+          this.freeSemicolon(token)
+          break
+
+        case '}':
+          this.end(token)
+          break
+
+        case 'comment':
+          this.comment(token)
+          break
+
+        case 'at-word':
+          this.atrule(token)
+          break
+
+        case '{':
+          this.emptyRule(token)
+          break
+
+        default:
+          this.other(token)
+          break
+      }
+    }
+    this.endFile()
+  }
+```
+
+### PostCSS의 플러그인으로 동작하는 Tailwind CSS
+
+브라우저의 렌더링 엔진이 HTML을 파싱하여 생성한 DOM이 HTML 요소를 변경할 수 있는 DOM API를 제공하는 것처럼 `PostCSS`의 AST는 플러그인에서 사용할 수 있는 유용한 [API](https://postcss.org/api/)를 제공합니다.
+
+`Tailwind CSS`와 같은 `PostCSS` 플러그인은 AST가 제공하는 API를 사용하여 원하는 형태로 CSS를 변환시킬 수 있습니다.
+
+실제로 `Tailwind CSS`도 `PostCSS`의 AST가 제공하는 API를 사용하여 CSS를 조작했었지만 Rust 언어로 작성되어 더 빠른 성능을 제공하는 CSS 파서인 [Lightning CSS](https://lightningcss.dev/)로 마이그레이션 중이라고 합니다😮
+
+> It would be cool if tailwind was no longer dependent on postcss, a potential alternative is lightning css which should be faster. https://lightningcss.dev/ it has built in prefixing as well so handles the autoprefixer use case too.
+>
+> Already planning on it — it's already integrated in `master` and has been for a few months 🫣
+>
+> - https://github.com/tailwindlabs/tailwindcss/discussions/11040#discussioncomment-5735771
+
+## Vanilla PostCSS & Tailwind CSS
+
+`Tailwind CSS`가 `PostCSS`의 플러그인으로서 어떻게 동작하는지 최소한의 구성으로 확인해보도록 하겠습니다.
+
+1. 임의의 디렉토리를 생성한 후, 해당 디렉토리 경로에서 터미널에 `npm init -y` 명령어를 입력하여 `package.json` 파일을 생성합니다.
+2. 터미널에 `npm i tailwindcss postcss-cli` 명령어를 입력하여 라이브러리를 설치합니다.
+   - [`postcss-cli`](https://github.com/postcss/postcss-cli#readme)는 CLI 환경에서 `postcss`를 사용할 수 있도록 하는 라이브러리입니다.
+3. 터미널에 `npx tailwindcss init` 명령어를 입력하여 프로젝트 루트 경로에 `tailwind.config.js` 설정 파일을 생성합니다.
+4. 터미널에 `touch postcss.config.js` 명령어를 입력하여 프로젝트 루트 경로에 `postcss.config.js` 설정 파일을 생성하고 아래와 같이 `plugins` 필드에 `tailwindcss`를 추가합니다.
+
+```js
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+  },
+};
+```
+
+5. 터미널에 `touch tailwind.css` 명령어를 입력하여 프로젝트 루트 경로에 CSS 파일을 생성하고 아래 내용을 추가합니다.
+   - 추후 `PostCSS`의 `tailwindcss` 플러그인은 해당 내용을 분석하여 필요한 CSS 스타일을 생성합니다.
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+6. `package.json` 파일의 `scripts` 필드를 아래와 같이 수정합니다.
+   - 스크립트가 실행되면, `PostCSS`는 `tailwindcss` 플러그인을 로드하여 `tailwind.css` 파일에 명시된 `@tailwind` 지시어들을 처리하고 필요한 CSS 스타일을 생성합니다.
+   - `tailwindcss` 플러그인에서 최종적으로 변환된 CSS는 `public/build/tailwind.css` 경로에 저장됩니다.
+
+```json
+"scripts": {
+  "build": "postcss tailwind.css -o public/build/tailwind.css"
+},
+```
+
+7. 터미널에 `npm run build` 명령어를 입력하여 `PostCSS`로 빌드된 CSS 파일을 생성합니다.
+   - 빌드 결과물로 생성된 `public/build/tailwind.css` 파일을 열어보면 CSS Normalize 이외에 `Tailwind CSS`가 제공하는 유틸리티 클래스는 확인할 수 없는데 이는 `Tailwind CSS`가 코드에서 실제로 사용하는 CSS만 생성하기 때문입니다.
+8. 프로젝트 루트 경로에 `public` 디렉토리를 생성하고 아래와 같이 `index.html` 파일을 생성합니다.
+
+- `public/index.html`
+
+```css
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" href="./build/tailwind.css" />
+  </head>
+  <body>
+    <h1 class="text-4xl font-bold text-center text-blue-500">Hello, World!</h1>
+  </body>
+</html>
+
+```
+
+9. [`Live Server`](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) 익스텐션 등으로 `index.html`을 실행시킵니다.
+
+   - 이때, `<h1>` 요소에 올바른 유틸리티 클래스를 명시했음에도 스타일이 적용되지 않는 것을 알 수 있는데 이는 `Tailwind CSS`가 `tailwind.config.js`의 `content` 필드에 명시된 파일들을 검색하여 해당 파일에 필요한 CSS를 생성하는 방식으로 작동하기 때문입니다.
+   - [tailwindcss content-configuration](https://tailwindcss.com/docs/content-configuration)
+
+10. `tailwind.config.js` 파일을 아래와 같이 수정해줍니다.
+
+```json
+module.exports = {
+  content: ["./public/index.html"], // content 필드에 Tailwind를 사용하는 파일 명시
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+```
+
+11. 터미널에 `npm run build` 명령어를 입력하여 다시 `PostCSS`로 빌드된 CSS 파일을 생성합니다.
+
+12. 빌드 결과물로 생성된 `public/build/tailwind.css` 파일을 열어보면 `index.html`에 필요한 유틸리티 클래스들이 추가된 것을 확인할 수 있습니다.
+
+```css
+... .text-center {
+  text-align: center;
+}
+.text-4xl {
+  font-size: 2.25rem;
+  line-height: 2.5rem;
+}
+.font-bold {
+  font-weight: 700;
+}
+.text-blue-500 {
+  --tw-text-opacity: 1;
+  color: rgb(59 130 246 / var(--tw-text-opacity));
+}
+```
+
+13. 다시 `index.html`을 실행시키면 스타일이 올바르게 적용된 `<h1>` 요소를 볼 수 있습니다. 🎉
+
+![Hello, World!](https://velog.velcdn.com/images/2wndrhs/post/64be00f1-dbe9-41f0-bfd8-8bf7c7be8330/image.png)
+
+## 마치며
+
+`create-next-app`으로 Next.js 프로젝트를 생성할 때마다 자동으로 설치되는 `PostCSS`가 어떤 역할을 하는지 궁금했었는데 이번 기회에 `PostCSS`에 대해서 자세히 알아볼 수 있었습니다.
+
+특히 그 과정에서 이번 학기에 수강한 “프로그래밍 언어” 과목의 내용을 확인할 수 있어 좋았습니다.
+
+언제나 느끼는 거지만 컴퓨터 전공 과목을 수강할 때는 이거를 왜 배우고 있나 싶지만 나중에 전혀 예상치 못했던 곳에서 배웠던 전공 지식과 연결되는 것이 신기한 것 같습니다.
+
+## 참고자료
+
+https://davidtheclark.com/its-time-for-everyone-to-learn-about-postcss/
+
+https://tailwindcss.com/docs/installation/using-postcss
+
+https://postcss.org/docs/postcss-architecture
+
+https://egghead.io/lessons/tailwind-set-up-tailwind-and-postcss

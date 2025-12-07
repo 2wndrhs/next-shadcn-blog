@@ -1,0 +1,271 @@
+export const metadata = {
+  title: 'pnpm workspace 패키지의 peer dependency 해결 방식',
+  description: 'pnpm workspace 패키지의 peer dependency 해결 방식',
+  publishDate: '2024-11-24',
+  tags: ['pnpm', 'pnpm workspace', 'peer dependency'],
+};
+
+## 들어가며
+
+최근 [pnpm workspace](https://pnpm.io/workspaces) 기능을 이용한 모노레포 환경에 대해 공부하던 중 pnpm workspace 패키지의 peer dependency 해결(resolve)방식의 특이한 점을 발견했습니다.
+
+그것은 **npm 레지스트리에 업로드된 패키지와 로컬에 설치된 workspace 패키지가 [peer dependency](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#peerdependencies)를 resolve하는 방식이 다르다는 것**이었는데 각 패키지에서 그러한 차이가 발생하는 이유와 peer dependency resolve 방식을 일치시키는 방법을 공유하려고 합니다.
+
+## peer dependency?
+
+peer dependency는 주로 호스트 패키지와 함께 사용되어야 하는 **플러그인 패키지에서 해당 플러그인과 호환되는 호스트 패키지의 버전을 명시**할 때 사용됩니다.
+
+예를 들어, Airbnb 자바스크립트 스타일 가이드에서 제공하는 ESLint 공유 설정인 [eslint-config-airbnb-base](https://www.npmjs.com/package/eslint-config-airbnb-base) 패키지는 ESLint(호스트 패키지)와 함께 사용되어야 하기 때문에 아래와 같이 `peerDependencies` 필드에 호환되는 ESLint 패키지의 버전을 명시합니다. ([코드](https://github.com/airbnb/javascript/blob/master/packages/eslint-config-airbnb-base/package.json#L82))
+
+```json
+// eslint-config-airbnb-base의 package.json
+{
+  "name": "eslint-config-airbnb-base",
+  "peerDependencies": {
+    "eslint": "^7.32.0 || ^8.2.0"
+  }
+}
+```
+
+그렇다면 `dependencies` 필드 대신 `peerDependencies` 필드에 ESLint 패키지 의존성을 명시하는 이유는 무엇일까요?
+
+```json
+{
+  "name": "eslint-config-airbnb-base",
+  "dependencies": {
+    "eslint": "^7.32.0 || ^8.2.0"
+  }
+}
+```
+
+만약 위와 같이 `dependencies` 필드에 ESLint 패키지 의존성을 추가했다면 ESLint v7.32.0을 사용하고 있는 애플리케이션에서 의존성 트리는 아래와 같이 생성될 것입니다.
+
+```json
+├── eslint@7.32.0
+└─┬ eslint-config-airbnb-base@15.0.0 // eslint-config-airbnb-base 최신 버전
+  └── eslint@8.57.1 // eslint Major 버전 8 기준 최신 버전
+```
+
+불필요하게 `eslint` 패키지가 중복 설치될 뿐만 아니라 애플리케이션이 사용하는 ESLint의 버전과 `eslint-config-airbnb-base` 패키지가 사용하는 ESLint의 버전이 다르기 때문에 버그 추적도 굉장히 어려워질 것입니다.
+
+반면, `peerDependencies` 필드에 추가한 의존성들은 상위 의존성 트리에서 resolve되기 때문에 애플리케이션에 설치된 의존성과 동일한 의존성을 사용하게 되어 위와 같은 문제들을 해결합니다.
+
+## pnpm의 peer dependency resolve 방식
+
+위에 설명한 것처럼 `peerDependencies` 필드에 추가한 의존성들은 상위 의존성 트리에서 resolve되기 때문에 부모 패키지에 설치된 의존성을 그대로 사용합니다.
+
+예를 들어, 아래와 같이 react 17 또는 18 버전을 peer dependency로 가지는 `shared-ui` 패키지가 있다고 가정해봅시다.
+
+```json
+{
+  "name": "shared-ui",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^17.0.0"
+  },
+  "devDependencies": {
+    "react": "17.0.0" // 개발 과정에서는 이전 버전과의 호환성을 검증하기 위해 가장 오래된 버전 설치
+  }
+}
+```
+
+`shared-ui` 패키지는 react를 peer dependency로 가지기 때문에 react 17 버전이 설치된 애플리케이션에서 `shared-ui` 패키지는 react 17 버전을 사용하고 react 18 버전이 설치된 애플리케이션에서 `shared-ui` 패키지는 react 18 버전을 사용해야 합니다.
+
+이러한 요구사항을 구현하기 위해 pnpm은 동일한 버전의 `shared-ui` 복사본을 루트 node_modules 하위 두 개의 다른 디렉토리에 각각 설치합니다. (더 정확히 말하자면 루트 node_modules 하위의 .pnpm 디렉토리(virtual store)에 peer dependency 버전마다 의존성 집합을 만들고 의존성 집합마다 별도의 `shared-ui` 복사본을 가집니다. ([how-peers-are-resolved](https://pnpm.io/how-peers-are-resolved)))
+
+즉, react 17 버전이 설치된 애플리케이션과 react 18 버전이 설치된 애플리케이션이 `shared-ui` 패키지에 대해 별도의 의존성 집합을 가지기 때문에 `shared-ui` 패키지는 애플리케이션에서 사용하는 react 버전에 맞게 react를 resolve 할 수 있는 것입니다.
+
+## pnpm workspace 패키지의 peer dependency resolve 방식
+
+하지만 npm 레지스트리에 업로드된 패키지가 아닌 로컬에 존재하는 workspace 패키지라면 pnpm의 peer dependency resolve 방식이 달라집니다.
+
+pnpm은 기본적으로 workspace 패키지에 대해서 해당 workspace 패키지 디렉토리를 가리키는 심볼릭 링크를 생성하고 심볼릭 링크를 통해 workspace 패키지를 resolve 합니다. (https://pnpm.io/workspaces#workspace-protocol-workspace)
+
+예를 들어, `shared-ui` 패키지가 로컬에 존재하는 workspace 패키지라면 pnpm은 `shared-ui` 패키지의 복사본을 생성하지 않고(즉, 별도의 의존성 집합을 생성하지 않고) `shared-ui` 패키지 디렉토리를 가리키는 심볼릭 링크만을 유지하기 때문에 `shared-ui` 패키지는 애플리케이션에 설치된 react 버전과 상관없이 자신의`devDependencies` 필드에 명시된 react 17.0.0 버전을 사용하는 문제가 발생합니다.
+
+즉, workspace 패키지의 `peerDependencies` 필드가 무시되는 문제가 발생합니다.
+
+## 해결책: injected dependency
+
+이러한 문제를 해결하기 위해 pnpm은 “[injected dependency](https://pnpm.io/package_json#dependenciesmetainjected)” 기능을 제공합니다.
+
+```json
+{
+  "name": "react-18-app",
+  "dependencies": {
+    "react": "^18.3.1",
+    "shared-ui": "workspace:^"
+  },
+  "dependenciesMeta": {
+    "shared-ui": {
+      "injected": true
+    }
+  }
+}
+```
+
+위와 같이 workspace 패키지를 종속성으로 가지는 애플리케이션의 `dependenciesMeta` 필드에 `injected` 옵션을 `true`로 설정하면 pnpm은 node_modules 하위 .pnpm 디렉토리(virtual store)에 workspace 패키지의 복사본을 생성합니다.
+
+workspace 패키지 디렉토리를 가리키는 심볼릭 링크가 아닌 실제 workspace 패키지의 복사본을 생성하기 때문에 workspace 패키지의 peer dependency 또한 상위 의존성 트리에서 정상적으로 resolve 할 수 있는 것입니다.
+
+## 실제 코드로 확인하기
+
+더 나은 이해를 위해 npm 레지스트리에 업로드된 패키지와 로컬에 설치된 workspace 패키지가 peer dependency를 resolve하는 방식이 어떻게 다른지 간단한 모노레포 환경을 만들어 확인해보겠습니다.
+
+모노레포에는 다양한 애플리케이션에서 사용할 수 있는 workspace 패키지인 `shared-ui` 패키지가 존재합니다. `shared-ui` 패키지는 react 17 또는 18 버전을 peer dependency로 가지고 `shared-ui` 패키지를 의존성으로 가지는 애플리케이션의 react 버전을 resovle해야 합니다.
+
+```json
+// packages/shared-ui/package.json
+{
+  "name": "shared-ui",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^17.0.0"
+  },
+  "devDependencies": {
+    "react": "17.0.0" // 개발 과정에서는 이전 버전과의 호환성을 검증하기 위해 가장 오래된 버전 설치
+  }
+}
+```
+
+또한 모노레포에는 react 17 버전 또는 18버전과 workspace 패키지인 `shared-ui` 패키지를 의존성으로 가지는 `react-17-app`, `react-18-app` 두 가지의 애플리케이션이 존재합니다.
+
+```json
+// apps/react-17-app/package.json
+{
+  "name": "react-17-app",
+  "dependencies": {
+    "react": "^17.0.2",
+    "shared-ui": "workspace:^"
+  }
+}
+```
+
+```json
+// apps/react-18-app/package.json
+{
+  "name": "react-18-app",
+  "dependencies": {
+    "react": "^18.3.1",
+    "shared-ui": "workspace:^"
+  }
+}
+```
+
+### 1. 로컬 workspace 패키지의 peer dependency resolve 방식
+
+`react-17-app`, `react-18-app`에서 workspace 패키지인 `shared-ui`의 peer dependency를 어떻게 resolve하고 있는지 패키지의 의존성을 확인할 수 있는 [`pnpm why`](https://pnpm.io/cli/why) 명령어로 확인해보겠습니다.
+
+실제 코드는 [pnpm-mono](https://github.com/2wndrhs/pnpm-mono)의 `local-workspace-dependency` 브랜치에서 확인하실 수 있습니다.
+
+![local-workspace-dependency-1.png](/img/pnpm-workspace-peer-dependency-resolve/local-workspace-dependency-1.png)
+
+workspace 패키지인 `shared-ui` 패키지 디렉토리를 가리키는 심볼릭 링크를 생성하고 `react-17-app`, `react-18-app`에서는 심볼릭 링크로 `shared-ui` 패키지를 resolve합니다.
+
+![local-workspace-dependency-2.png](/img/pnpm-workspace-peer-dependency-resolve/local-workspace-dependency-2.png)
+
+또한 심볼릭 링크로 참조되는 `shared-ui` 패키지에서 `peerDependencies` 필드는 무시되고 `devDependencies` 필드에 명시된 react 17.0.0 버전을 resolve하고 있음을 확인할 수 있습니다.
+
+### 2. npm 레지스트리에 업로드된 패키지의 peer dependency resolve 방식
+
+다음으로, `shared-ui` 패키지를 npm 레지스트리에 업로드하고 `react-17-app`, `react-18-app`에서 `shared-ui`의 peer dependency를 어떻게 resolve하고 있는지 확인해보겠습니다.
+
+```json
+// apps/react-17-app/package.json
+{
+  "name": "react-17-app",
+  "dependencies": {
+    "react": "^17.0.2",
+    "shared-ui": "^1.0.0"
+  }
+}
+```
+
+```json
+// apps/react-18-app/package.json
+{
+  "name": "react-18-app",
+  "dependencies": {
+    "react": "^18.3.1",
+    "shared-ui": "^1.0.0"
+  }
+}
+```
+
+실제 코드는 [pnpm-mono](https://github.com/2wndrhs/pnpm-mono/tree/npm-published-dependency)의 `npm-published-dependency` 브랜치에서 확인하실 수 있습니다.
+
+![npm-published-dependency-1.png](/img/pnpm-workspace-peer-dependency-resolve/npm-published-dependency-1.png)
+
+`react-17-app`에서는 `shared-ui` 패키지가 peer dependency로 react 17 버전을 resolve하고 `react-18-app`에서는 `shared-ui` 패키지가 peer dependency로 react 18 버전을 resolve 합니다.
+
+![npm-published-dependency-2.png](/img/pnpm-workspace-peer-dependency-resolve/npm-published-dependency-2.png)
+
+![npm-published-dependency-3.png](/img/pnpm-workspace-peer-dependency-resolve/npm-published-dependency-3.png)
+
+또한 `react-17-app`, `react-18-app`이 `shared-ui` 패키지에 대해 별도의 의존성 집합을 가지고 `shared-ui` 패키지는 각 애플리케이션에서 사용하는 react 버전을 resolve 하고 있음을 확인할 수 있습니다.
+
+### 3. injected dependency의 peer dependency resolve 방식
+
+마지막으로, `react-17-app`, `react-18-app`의 package.json 파일을 수정하여 `shared-ui` 패키지를 injected dependency로 만든 후 각 애플리케이션에서 `shared-ui` 의 peer dependency가 어떻게 resolve 되는지 확인해보겠습니다.
+
+```json
+// apps/react-17-app/package.json
+{
+  "name": "react-17-app",
+  "dependencies": {
+    "react": "^17.0.2",
+    "shared-ui": "workspace:^"
+  },
+  "dependenciesMeta": {
+    "shared-ui": {
+      "injected": true
+    }
+  }
+}
+```
+
+```json
+// apps/react-18-app/package.json
+{
+  "name": "react-18-app",
+  "dependencies": {
+    "react": "^18.3.1",
+    "shared-ui": "workspace:^"
+  },
+  "dependenciesMeta": {
+    "shared-ui": {
+      "injected": true
+    }
+  }
+}
+```
+
+실제 코드는 [pnpm-mono](https://github.com/2wndrhs/pnpm-mono/tree/injected-dependency)의 `injected-dependency` 브랜치에서 확인하실 수 있습니다.
+
+![injected-dependency-1.png](/img/pnpm-workspace-peer-dependency-resolve/injected-dependency-1.png)
+
+`react-17-app`에서는 workspace 패키지인 `shared-ui` 패키지 디렉토리를 가리키는 심볼릭 링크로`shared-ui` 패키지를 resolve하고 `react-18-app`에서는 별도의 `shared-ui` 패키지 복사본을 resolve 합니다.
+
+![injected-dependency-2.png](/img/pnpm-workspace-peer-dependency-resolve/injected-dependency-2.png)
+
+[pnpm 공식문서](https://pnpm.io/package_json#dependenciesmetainjected) 의 설명대로라면 `react-17-app`도 `react-18-app`처럼 `shared-ui` 패키지에 대해 별도의 의존성 집합을 가지는 것이 맞지만 `react-17-app`의 `dependencies` 의존성인 react의 버전과 `shared-ui`의 `devDependencies` 의존성인 react의 버전이 동일하여 별도의 의존성 집합을 만들지 않고 심볼릭 링크로 `shared-ui` 패키지를 resolve하는 것 같습니다.
+
+## injected dependency의 문제점
+
+이처럼 pnpm의 injected dependency 기능을 활용하면 로컬에 존재하는 workspace 패키지의 peer dependency resolve 문제를 깔끔하게 해결할 수 있습니다.
+
+하지만 이렇게 injected dependency로 추가한 workspace 패키지를 소비하는 애플리케이션에서는 심볼릭 링크로 최신 상태의 workspace 패키지를 참조하는 것이 아닌 workspace 패키지가 빌드될 당시의 패키지를 참조하는 것이기 때문에 workspace 패키지의 코드가 수정될 때마다 해당 변경사항을 workspace 패키지를 소비하는 애플리케이션에 반영해 줄 필요가 있습니다.
+
+현재 pnpm은 이러한 sync 문제를 해결하는 빌트인 솔루션을 제공하지 않고 있기 때문에 injected dependency가 변경될 때마다 직접 빌드를 수행하거나 [pnpm-sync](https://www.npmjs.com/package/pnpm-sync-lib)나 [pnpm-sync-dependencies-meta-injected](https://www.npmjs.com/package/pnpm-sync-dependencies-meta-injected) 와 같은 서드파티 솔루션을 사용해야 합니다.
+
+## 마치며
+
+그동안 프로젝트에 pnpm을 사용하면서도 pnpm이 모듈을 resolve 하는 방식에 대해서는 전혀 모르고 있었는데 이번 기회에 자세히 알아볼 수 있어 좋았습니다.
+
+특히 모노레포를 도입하고 있는 팀이 많아진 만큼 workspace 패키지의 독특한 peer dependency resolve 방식으로 인한 문제도 많이 발생할 것 같은데 이번 글이 도움이 되었으면 좋겠습니다.
+
+## 참고자료
+
+- https://pnpm.io/workspaces
+- https://nodejs.org/en/blog/npm/peer-dependencies
+- https://rushjs.io/pages/advanced/injected_deps/
+- https://pnpm.io/package_json#dependenciesmetainjected
+- https://github.com/pnpm/pnpm/releases/tag/v6.20.0
