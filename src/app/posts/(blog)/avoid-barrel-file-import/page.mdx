@@ -1,0 +1,284 @@
+import Callout from '@/components/mdx/Callout';
+
+export const metadata = {
+  title: 'React 앱 빌드 성능 개선하기 - 배럴 파일 import 제거',
+  description:
+    'React 앱 빌드 성능 개선하기 - 배럴 파일 import 제거',
+  publishDate: '2026-05-19',
+  tags: ['React', 'Next.js', 'Build Performance'],
+};
+
+## 들어가며
+
+최근 Vercel에서 React, Next.js 애플리케이션을 위한 성능 최적화 가이드인 [react-best-practices](https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices)를 공개했습니다. 중요도 순으로 정렬된 40개 이상의 규칙들 중 [Avoid Barrel File Imports](https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/rules/bundle-barrel-imports.md#avoid-barrel-file-imports) 규칙은 **CRITICAL 등급**으로 지정되었고 **15-70% 빠른 개발 서버, 28% 빠른 빌드, 40% 빠른 콜드 스타트, 더 빠른 HMR**을 제공한다고 합니다.
+
+어떻게 배럴 파일 import 제거만으로 빌드 성능을 극적으로 개선할 수 있을까요? 이번 글에서는 배럴 파일 import가 빌드 과정에서 왜 병목이 되는지, 어떤 방식으로 이를 개선할 수 있을지 살펴보겠습니다.
+
+## 배럴 파일이란
+
+배럴 파일(barrel file)은 **여러 모듈의 export를 한 곳에 모아 다시 내보내는 진입점 파일**을 말합니다. 보통 `index.ts` 같은 이름으로 작성하며, 관련된 모듈들을 하나의 공개 API로 묶어 외부에서 더 짧고 단순한 경로로 import할 수 있게 해줍니다.
+
+예를 들어, `utils` 디렉토리 하위에 `module1`, `module2`, `module3`가 있을 때, `utils` 디렉토리 위치에 `index.ts` 배럴 파일을 만들 수 있습니다.
+
+```typescript
+// utils/index.ts
+export { default as module1 } from './module1';
+export { default as module2 } from './module2';
+export { default as module3 } from './module3';
+```
+
+그러면 사용하는 쪽에서는 내부 파일 구조를 모두 파악할 필요 없이 아래처럼 가져올 수 있습니다.
+
+```typescript
+import { module1, module2, module3 } from './utils';
+```
+
+이처럼 배럴 파일은 import 경로를 단순하게 만들고, 모듈의 공개 범위를 한 곳에서 관리할 수 있다는 장점이 있어 다양한 패키지에서 널리 사용됩니다.
+
+## 배럴 파일 import는 왜 느릴까
+
+장점이 많은 배럴 파일이지만 배럴 파일 import에는 숨겨진 비용이 있습니다. 수천 개의 모듈을 re-export 하는 배럴 파일에서 단 한 개의 모듈만 사용한다 하더라도, **배럴 파일이 import 하는 수천 개의 모듈에 대한 비용을 지불**해야 합니다.
+
+예를 들어, `import { Button } from '@mui/material'`처럼 라이브러리의 한 모듈만 사용해도, `@mui/material` 패키지의 엔트리 파일(`index.js`)이 수천 개의 모듈을 re-export 하는 배럴 파일일 수 있습니다.
+
+이때, 번들러는 단순히 엔트리 파일 하나만 읽지 않습니다. `Button`이 어느 모듈에서 export 되는지 알아내기 위해 export 체인을 따라가며 모듈 그래프를 만들어야 하고, 모듈 그래프 생성 중 다른 배럴 파일을 만나면 필요한 모듈의 위치를 찾기 위해 수많은 하위 모듈을 방문해야 합니다.
+
+유명한 컴포넌트 라이브러리의 경우 [배럴 파일에서 10,000개 가량의 모듈을 re-export](https://github.com/mui/material-ui/blob/master/packages/mui-material/src/index.js) 하고 있고 해당 배럴 파일을 import 하는 것만으로 [개발 서버 시작 속도와 프로덕션 빌드 성능에 200 ~ 800ms 가량의 오버헤드가 발생](https://vercel.com/blog/how-we-optimized-package-imports-in-next-js#what's-the-problem-with-barrel-files)합니다.
+
+## 트리 셰이킹?
+
+실제로 사용하지 않는 코드를 제거하는 [트리 셰이킹](https://rollupjs.org/faqs/#what-is-tree-shaking)이 배럴 파일 import의 불필요한 모듈 해석 과정을 해결할 수 있지 않을까요?
+
+결론부터 말하면 **아닙니다.** 가지를 치기 이전에 나무가 있어야 하듯이 트리 셰이킹은 모듈 그래프를 기반으로 이루어집니다. 배럴 파일의 모듈을 탐색하는 과정은 모듈 그래프(나무)를 만드는 과정이기 때문에 트리 셰이킹은 이 단계에서 개입할 수 없습니다.
+
+즉, 트리 셰이킹은 최종 번들에서 사용하지 않는 코드를 제거하는 데는 도움이 되지만, 배럴 파일 import로 인해 많은 모듈을 해석해야 하는 비용을 제거하지는 못합니다.
+
+## optimizePackageImports
+
+Next.js는 배럴 파일로 인한 빌드 성능 저하 문제를 해결하기 위해 [`optimizePackageImports`](https://nextjs.org/docs/app/api-reference/config/next-config-js/optimizePackageImports) 옵션을 제공합니다.
+
+```javascript
+// next.config.js
+module.exports = {
+  experimental: {
+    optimizePackageImports: ['package-name'],
+  },
+};
+```
+
+`optimizePackageImports`에 명시한 패키지들은 Next.js 자체적으로 배럴 파일에 대한 최적화를 수행하며 `lucide-react`, `ant-design`, `material-ui` 등 사용량이 많은 패키지들은 기본적으로 `optimizePackageImports`에 추가되어 최적화됩니다.
+
+[Avoid Barrel File Imports](https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/rules/bundle-barrel-imports.md#avoid-barrel-file-imports) 규칙에서 설명하는 성능 향상도 `optimizePackageImports` 최적화를 기반으로 이루어집니다.
+
+### optimizePackageImports의 동작 방식
+
+`optimizePackageImports`가 어떻게 배럴 파일 import를 최적화하는지 실제 코드로 확인해보겠습니다.
+
+<Callout icon='lightbulb'>
+  Turbopack이 아닌 Webpack 번들러 기준으로 설명합니다.
+</Callout>
+
+1. 배럴 파일(`foo.js`)에서 모듈을 import 하는 코드를 인식합니다.
+
+```javascript
+import { a } from 'foo';
+
+// foo.js
+export { a } from './a';
+export { b } from './b';
+export { c } from './c';
+```
+
+2. [packages/next/src/build/webpack/loaders/next-swc-loader.ts](https://github.com/vercel/next.js/blob/ec0279c7a9416cd2b8182167d4e526d2688ae21a/packages/next/src/build/webpack/loaders/next-swc-loader.ts#L157)에서 `optimizePackageImports`에 명시된 패키지들로 SWC 로더의 옵션을 만들고 `transform()` 함수를 호출합니다.
+
+```javascript
+// packages/next/src/build/webpack/loaders/next-swc-loader.ts
+const swcOptions = getLoaderSWCOptions({
+  // ...
+  optimizePackageImports: nextConfig?.experimental?.optimizePackageImports,
+  // ...
+});
+
+return transform(source, programmaticOptions);
+```
+
+3. [packages/next/src/build/swc/options.ts](https://github.com/vercel/next.js/blob/ec0279c7a9416cd2b8182167d4e526d2688ae21a/packages/next/src/build/swc/options.ts#L506)에서 `optimizePackageImports` 옵션을 SWC의 `autoModularizeImports` 옵션으로 수정합니다.
+
+```javascript
+// packages/next/src/build/swc/options.ts
+if (optimizePackageImports) {
+  baseOptions.autoModularizeImports = {
+    packages: optimizePackageImports,
+  };
+}
+```
+
+4. [crates/next-custom-transforms/src/transforms/named_import_transform.rs](https://github.com/vercel/next.js/blob/ec0279c7a9416cd2b8182167d4e526d2688ae21a/crates/next-custom-transforms/src/transforms/named_import_transform.rs#L71)에서 패키지에 대한 named import를 가상 경로로 수정합니다.
+
+```rust
+// crates/next-custom-transforms/src/transforms/named_import_transform.rs
+let new_src = format!(
+  "__barrel_optimize__?names={}!=!{}",
+  names.join(","),
+  src_value.to_string_lossy()
+)
+```
+
+```javascript
+// AS-IS
+import { a } from 'foo';
+
+// TO-BE
+import { a } from '__barrel_optimize__?names=a!=!foo';
+```
+
+5. 수정된 가상 경로 import에 대해 [packages/next/src/build/webpack-config.ts](https://github.com/vercel/next.js/blob/ec0279c7a9416cd2b8182167d4e526d2688ae21a/packages/next/src/build/webpack-config.ts#L1951)의 `next-barrel-loader`가 실행됩니다. `names`에는 사용자가 실제로 import한 모듈 이름(`a`)이 넘어갑니다.
+
+```javascript
+// packages/next/src/build/webpack-config.ts
+{
+  test: /__barrel_optimize__/,
+  use: ({ resourceQuery }) => {
+    const names = (resourceQuery.match(/\?names=([^&]+)/)?.[1] || '').split(',');
+
+    return [
+      {
+        loader: 'next-barrel-loader',
+        options: { names, swcCacheDir },
+      },
+    ];
+  },
+}
+```
+
+6. `next-barrel-loader`는 [crates/next-custom-transforms/src/transforms/optimize_barrel.rs](https://github.com/vercel/next.js/blob/ec0279c7a9416cd2b8182167d4e526d2688ae21a/crates/next-custom-transforms/src/transforms/optimize_barrel.rs)을 실행하여 export map을 만듭니다.
+
+`export map`의 각 엔트리는 `["<barrel export name>", "<source module path>", "<source export name>"]` 형식입니다. 예를 들어 `import { a as b } from './module-a'`는 `["b", "./module-a", "a"]`로 표현됩니다.
+
+```javascript
+// input
+export { a } from './a';
+export { b } from './b';
+export { c } from './c';
+
+// SWC optimizeBarrelExports output
+export const __next_private_export_map__ =
+  '[["a","./a","a"],["b","./b","b"],["c","./c","c"],...]';
+```
+
+7. `next-barrel-loader`가 export map을 기반으로 실제로 import 되는 모듈(`a`)만 export 하는 가상 모듈을 만듭니다.
+
+```javascript
+// packages/next/src/build/webpack/loaders/next-barrel-loader.ts
+for (const name of names) {
+  if (exportMap.has(name)) {
+    const decl = exportMap.get(name)!;
+
+    if (decl[1] === 'default') {
+      output += `\nexport { default as ${name} } from ${JSON.stringify(decl[0])}`;
+    } else if (decl[1] === name) {
+      output += `\nexport { ${name} } from ${JSON.stringify(decl[0])}`;
+    } else {
+      output += `\nexport { ${decl[1]} as ${name} } from ${JSON.stringify(decl[0])}`;
+    }
+  }
+}
+```
+
+```javascript
+// next-barrel-loader가 만드는 가상 모듈
+export { a } from './a';
+```
+
+결과적으로 `import { a } from 'foo'`는 `foo.js` 배럴 파일을 거치지 않고 `a` 모듈을 export 하는 가상 모듈에서 `a` 모듈을 import 하기 때문에 배럴 파일의 불필요한 모듈 해석 과정이 제거됩니다.
+
+### 간접 의존성에서의 주의점
+
+만약 `optimizePackageImports` 옵션에 추가한 패키지가 직접 의존성이 아닌 간접 의존성일 경우 배럴 파일 최적화가 정상적으로 적용되지 않을 수 있습니다.
+
+예를 들어, 애플리케이션에서 `ui` 패키지만 import하여 사용하고(직접 의존성), `ui` 패키지 내부에서 `icon-lib` 패키지를 import하여 사용하는 경우(간접 의존성)를 생각해 보겠습니다.
+
+```javascript
+// app/page.tsx
+import { Button } from 'ui';
+
+// packages/ui/button.tsx
+import { IconA } from 'icon-lib';
+```
+
+이때 `ui` 패키지가 SWC의 변환(transform) 대상이 아니라면, Next.js는 `packages/ui/button.tsx` 안의 `import { IconA } from 'icon-lib'`를 최적화할 수 없습니다.
+
+즉, `icon-lib` 패키지를 `optimizePackageImports`에 추가해도 간접 의존성 내부의 배럴 import가 그대로 남아 빌드 성능 저하를 일으킬 수 있습니다.
+
+이러한 경우에는 `ui` 패키지를 [`transpilePackages`](https://nextjs.org/docs/app/api-reference/config/next-config-js/transpilePackages)에 포함해 `ui` 패키지의 내부 코드도 SWC가 변환하도록 하고, `ui` 패키지가 import하는 `icon-lib` 패키지도 `optimizePackageImports`에 포함해야 합니다.
+
+```javascript
+// next.config.js
+module.exports = {
+  transpilePackages: ['ui'],
+  experimental: {
+    optimizePackageImports: ['icon-lib'],
+  },
+};
+```
+
+> Yes that should work. You have to make sure that 'a' is transpiled and then 'b' is in that optimizePackageImports list, so the framework can touch everything 'a' imports from 'b' and shortcut the path.
+>
+> - [Shu Ding](https://x.com/shuding/status/1712984702284333161)
+
+## Direct Imports
+
+`optimizePackageImports` 옵션을 사용할 수 없는 일반적인 React 애플리케이션에서는 어떻게 배럴 파일 import를 최적화할 수 있을까요?
+
+`lucide-react`, `ant-design`, `material-ui` 등 모던한 라이브러리는 루트 import 외에 외부에 제공할 하위 import 경로를 명시하는 [subpath export](https://nodejs.org/api/packages.html#subpath-exports)를 사용합니다.
+
+```json
+// package.json
+"exports": {
+  ".": "./src/index.js",
+  "./Button": "./src/Button/index.ts",
+  "./Grid": "./src/Grid/index.ts"
+}
+```
+
+위와 같은 subpath export가 제공된다면 사용처에서는 배럴 파일을 거치지 않고 실제 사용하는 모듈만 import 할 수 있기 때문에 배럴 파일의 불필요한 모듈 해석 과정을 회피할 수 있습니다.
+
+```typescript
+// AS-IS: 패키지 루트의 배럴 파일을 통해 import
+import { Button, Grid } from '@mui/material';
+
+// TO-BE: 필요한 모듈만 직접 import
+import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
+```
+
+## 번들러의 Lazy Barrel 최적화
+
+많은 번들러도 배럴 파일을 더 효율적으로 처리하기 위한 최적화를 제공하고 있습니다.
+
+Rolldown 번들러는 [Lazy Barrel Optimization](https://rolldown.rs/in-depth/lazy-barrel-optimization#lazy-barrel-optimization) 옵션, Rspack 번들러는 기본적으로 활성화된 [Lazy Barrel](https://rspack.rs/guide/optimization/lazy-barrel#lazy-barrel) 최적화로 사이드 이펙트가 없다고 판단되면 배럴 파일에서 실제로 사용되는 re-export 모듈만 컴파일하여 빌드 성능을 개선합니다.
+
+```javascript
+// rolldown.config.js
+export default {
+  experimental: {
+    lazyBarrel: true,
+  },
+};
+```
+
+## 마치며
+
+Next.js의 `optimizePackageImports`, Rolldown과 Rspack의 Lazy Barrel 최적화 등 많은 프레임워크와 번들러는 배럴 파일 import로 인한 빌드 성능 저하를 심각하게 받아들이고 개선을 위해 노력하고 있습니다.
+
+이런 변화에 맞춰 라이브러리 개발자는 프레임워크와 번들러가 배럴 파일을 효율적으로 최적화할 수 있도록 `package.json`에 `"sideEffects": false`를 잘 명시하고, 사용처에서 배럴 파일을 우회할 수 있도록 `exports` 필드를 통한 subpath export를 제공할 필요가 있습니다.
+
+라이브러리 사용자 역시 [speed-measure-webpack-plugin](https://github.com/stephencookdev/speed-measure-webpack-plugin), [Rsdoctor](https://rsdoctor.rs/) 등의 빌드 분석 도구로 병목이 되는 패키지를 찾아 패키지가 제공하는 subpath export 경로를 사용하거나 Next.js의 `optimizePackageImports` 옵션을 적극적으로 사용하여 React 애플리케이션의 빌드 성능을 개선해보면 좋을 것 같습니다.
+
+## 참고자료
+
+- [How we optimized package imports in Next.js - Vercel](https://vercel.com/blog/how-we-optimized-package-imports-in-next-js)
+- [agent-skills/skills/react-best-practices/rules/bundle-barrel-imports.md at main · vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/rules/bundle-barrel-imports.md#avoid-barrel-file-imports)
+- [Speeding up the JavaScript ecosystem - The barrel file debacle](https://marvinh.dev/blog/speeding-up-javascript-ecosystem-part-7/)
+- [Rolldown | Rust bundler for JavaScript](https://rolldown.rs/in-depth/lazy-barrel-optimization#lazy-barrel-optimization)
+- [Lazy barrel - Rspack](https://rspack.rs/guide/optimization/lazy-barrel#lazy-barrel)
