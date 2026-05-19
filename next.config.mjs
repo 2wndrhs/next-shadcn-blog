@@ -1,8 +1,4 @@
 import createMDX from '@next/mdx';
-import rehypeExternalLinks from 'rehype-external-links';
-import rehypePrettyCode from 'rehype-pretty-code';
-import rehypeSlug from 'rehype-slug';
-import remarkGfm from 'remark-gfm';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -22,18 +18,18 @@ const nextConfig = {
 const withMDX = createMDX({
   // Add markdown plugins here, as desired
   options: {
-    remarkPlugins: [remarkGfm],
+    remarkPlugins: ['remark-gfm'],
     rehypePlugins: [
-      rehypeSlug,
+      'rehype-slug',
       [
-        rehypeExternalLinks,
+        'rehype-external-links',
         {
           target: '_blank',
           rel: ['noopener noreferrer'],
         },
       ],
       [
-        rehypePrettyCode,
+        'rehype-pretty-code',
         {
           theme: 'one-dark-pro',
         },

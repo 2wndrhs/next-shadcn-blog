@@ -1,7 +1,8 @@
 @import 'tailwindcss';
-@plugin "@tailwindcss/typography";
+@import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
 @plugin 'tailwind-scrollbar';
-@config "../../tailwind.config.js";
+@config '../../tailwind.config.js';
 
 @custom-variant dark (&:is(.dark *));
 

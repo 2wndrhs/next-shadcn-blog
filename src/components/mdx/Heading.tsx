@@ -1,7 +1,7 @@
 'use client';
 
 import { Hash } from 'lucide-react';
-import { HTMLMotionProps, motion } from 'motion/react';
+import { HTMLMotionProps, motion, type Variants } from 'motion/react';
 
 const iconVariants = {
   initial: {
@@ -16,7 +16,7 @@ const iconVariants = {
       ease: 'easeOut',
     },
   },
-};
+} satisfies Variants;
 
 export default function Heading({
   as,

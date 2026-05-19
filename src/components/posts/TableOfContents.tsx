@@ -20,6 +20,8 @@ export default function TableOfContents() {
       text: heading.textContent ?? '',
       level: parseInt(heading.tagName.charAt(1)),
     }));
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- TOC is derived from rendered MDX headings after mount.
     setToc(newToc);
 
     // Set up Intersection Observer
