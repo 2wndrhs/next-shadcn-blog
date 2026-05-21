@@ -26,7 +26,7 @@ export default function Callout({
   return (
     <aside
       className={cn(
-        'border-border bg-muted/50 text-foreground my-6 rounded-xl border p-4 text-sm',
+        'border-border bg-muted/50 text-foreground my-6 rounded-xl border p-4 text-base',
         className,
       )}
       {...props}
