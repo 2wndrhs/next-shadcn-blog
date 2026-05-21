@@ -76,7 +76,7 @@ export default function TableOfContents() {
     >
       <ul className='flex flex-col gap-2 text-sm'>
         {toc.map(({ id, text, level }) => (
-          <li key={id} className={`pl-${(level - 1) * 4}`}>
+          <li key={id} className={`pl-${(level - 1) * 2}`}>
             <a
               href={`#${id}`}
               className={`hover:text-foreground/80 block py-0.5 transition-colors duration-200 ease-in-out ${
