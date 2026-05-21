@@ -35,10 +35,10 @@ export default function Heading({
     >
       <motion.a
         href={`#${props.id}`}
-        className='absolute top-1/2 -left-6 flex size-6 -translate-y-1/2 items-center justify-center'
+        className='absolute top-1/2 -left-7 flex size-7 -translate-y-1/2 items-center justify-center'
         variants={iconVariants}
       >
-        <Hash className='size-4' />
+        <Hash className='size-5' />
       </motion.a>
       {children as React.ReactNode}
     </MotionComponent>
