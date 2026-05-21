@@ -1,10 +1,12 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import { Check, Copy } from 'lucide-react';
 import { ComponentPropsWithoutRef, useRef, useState } from 'react';
 
 export default function Pre({
   children,
+  className,
   ...props
 }: ComponentPropsWithoutRef<'pre'>) {
   const [isCopied, setIsCopied] = useState(false);
@@ -24,15 +26,24 @@ export default function Pre({
   };
 
   return (
-    <div className='relative'>
+    <div className='group relative'>
       <button
+        type='button'
         disabled={isCopied}
         onClick={handleClickCopy}
-        className='absolute top-4 right-4 size-6'
+        className='pointer-events-none absolute top-2 right-2 inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-white/20 bg-slate-950/90 text-slate-100 opacity-0 shadow-lg shadow-black/30 transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-slate-800 disabled:cursor-default'
       >
-        {isCopied ? <Check className='text-green-400' /> : <Copy />}
+        {isCopied ? (
+          <Check className='size-4 text-green-400' />
+        ) : (
+          <Copy className='size-4' />
+        )}
       </button>
-      <pre ref={preRef} {...props}>
+      <pre
+        ref={preRef}
+        className={cn(className, '[font-variant-ligatures:none]')}
+        {...props}
+      >
         {children}
       </pre>
     </div>
